@@ -175,7 +175,7 @@
   /* ---------- LAYOUT: BARRA LATERAL + ÁREA PRINCIPAL ---------- */
   #app-shell{ display:flex; min-height:100vh; }
   #sidebar{
-    width:230px; flex-shrink:0; background:var(--gold);
+    width:252px; flex-shrink:0; background:var(--gold);
     display:flex; flex-direction:column; padding:26px 0 20px;
     position:sticky; top:0; height:100vh; overflow-y:auto;
     box-shadow:2px 0 8px rgba(16,24,32,0.06);
@@ -183,14 +183,15 @@
   }
   #sidebar-brand{ padding:0 22px 26px; }
   #sidebar-brand #header-brand{
-    display:flex; flex-direction:column; align-items:stretch; gap:12px; width:100%;
+    display:flex; flex-direction:row; align-items:center; gap:12px; width:100%;
   }
-  #sidebar-brand .wordmark{ color:#ffffff; font-size:1.3rem; margin:0; }
+  #sidebar-brand .wordmark{ color:#ffffff; font-size:1.3rem; margin:0; flex-shrink:0; }
   #sidebar-brand .wordmark span{ color:rgba(255,255,255,0.65) !important; }
   #sidebar-brand .brand-logo{
-    background:#ffffff; width:100% !important; height:64px !important; object-fit:contain;
-    padding:10px 14px; border-radius:10px; box-sizing:border-box;
-    border-left:none !important; margin-left:0 !important; max-width:100% !important;
+    background:#ffffff; width:auto !important; height:58px !important; object-fit:contain;
+    padding:8px 12px; border-radius:10px; box-sizing:border-box;
+    border-left:none !important; margin-left:0 !important; max-width:150px !important;
+    flex-shrink:0;
   }
   #sidebar-brand .brand-client-name{
     color:rgba(255,255,255,0.7);
