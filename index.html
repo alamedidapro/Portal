@@ -202,6 +202,11 @@
     font-family:'Work Sans', sans-serif;
   }
   .client-card input[type=text]:focus{ outline:none; border-color:var(--leaf); }
+  .logo-preview-img{
+    height:44px; max-width:120px; object-fit:contain;
+    border:1px solid var(--line); border-radius:8px; padding:4px;
+    background:#ffffff; display:block;
+  }
   input[type=color].color-input{
     width:44px; height:44px; padding:2px; margin:0;
     background:#ffffff; border:1px solid var(--line);
@@ -527,8 +532,17 @@
         </div>
         <div class="user-form-row">
           <div style="flex:2;">
-            <label for="c-logo">Logo (URL, opcional — si se deja vacío se muestra el nombre)</label>
-            <input type="url" id="c-logo" placeholder="https://.../logo.png">
+            <label for="c-logo">Logo (opcional — pega una URL o sube una imagen; si se deja vacío se muestra el nombre)</label>
+            <input type="text" id="c-logo" placeholder="https://.../logo.png">
+          </div>
+          <div style="flex:0 0 auto;">
+            <label>&nbsp;</label>
+            <label for="c-logo-file" class="btn-outline-leaf" style="display:inline-flex; align-items:center; padding:12px 16px; cursor:pointer;">Subir imagen</label>
+            <input type="file" id="c-logo-file" accept="image/*" style="display:none;">
+          </div>
+          <div id="c-logo-preview-row" style="display:none; flex:0 0 auto;">
+            <label>&nbsp;</label>
+            <img id="c-logo-preview" class="logo-preview-img">
           </div>
         </div>
         <p id="client-form-error" class="form-error"></p>
@@ -1108,6 +1122,38 @@ function crearTarjetaUsuario(u) {
    Lista independiente de "empresas/clientes" que luego se puede marcar
    por usuario en la pestaña Usuarios, igual que los tableros.
 ====================================================================== */
+/* ---- Procesa un archivo de imagen subido: lo redimensiona y lo convierte
+   en un data URI (base64) para guardarlo directo en el campo logoUrl,
+   sin necesidad de Firebase Storage. ---- */
+const LOGO_MAX_ALTO = 120; // px — de sobra para cómo se muestra el logo en el portal
+const LOGO_MAX_BYTES = 700000; // ~700KB, deja margen bajo el límite de 1MB de Firestore
+
+function procesarArchivoLogo(file, onListo, onError) {
+  const reader = new FileReader();
+  reader.onerror = () => (onError || (() => {}))('No se pudo leer el archivo.');
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onerror = () => (onError || (() => {}))('El archivo no parece ser una imagen válida.');
+    img.onload = () => {
+      const escala = Math.min(1, LOGO_MAX_ALTO / img.height);
+      const w = Math.max(1, Math.round(img.width * escala));
+      const h = Math.max(1, Math.round(img.height * escala));
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/png');
+      if (dataUrl.length > LOGO_MAX_BYTES) {
+        (onError || (() => {}))('La imagen sigue siendo muy pesada. Prueba con un logo más simple o en formato JPG.');
+        return;
+      }
+      onListo(dataUrl);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 const CLIENTES = "vivero_clientes";
 let todosClientes = [];
 let unsubscribeClientes = null;
@@ -1224,11 +1270,18 @@ function crearTarjetaCliente(c) {
   div.innerHTML = `
     <div class="client-field">
       <label>Nombre</label>
-      <input type="text" value="${escapeHtml(c.nombre)}">
+      <input type="text" class="client-name-input" value="${escapeHtml(c.nombre)}">
     </div>
     <div class="client-field">
-      <label>Logo (URL, opcional)</label>
-      <input type="url" value="${escapeHtml(c.logoUrl || '')}" placeholder="https://.../logo.png">
+      <label>Logo (URL o subir imagen)</label>
+      <input type="text" class="logo-url-input" value="${escapeHtml(c.logoUrl || '')}" placeholder="https://.../logo.png">
+      <div style="display:flex; align-items:center; gap:10px; margin-top:8px;">
+        <label class="btn-outline-leaf logo-upload-label" style="padding:7px 12px; font-size:0.78rem; cursor:pointer;">
+          Subir imagen
+          <input type="file" accept="image/*" class="logo-file-input" style="display:none;">
+        </label>
+        <img class="logo-preview-img" style="height:32px; padding:2px; display:${c.logoUrl ? 'block' : 'none'};" src="${c.logoUrl ? escapeHtml(c.logoUrl) : ''}">
+      </div>
     </div>
     <div class="color-field">
       <label>Primario</label>
@@ -1243,9 +1296,29 @@ function crearTarjetaCliente(c) {
     <button type="button" class="btn-toggle" data-action="toggle">${c.activo ? 'Desactivar' : 'Activar'}</button>
   `;
 
+  const logoUrlInput = div.querySelector('.logo-url-input');
+  const logoPreviewImg = div.querySelector('.logo-preview-img');
+
+  div.querySelector('.logo-file-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    procesarArchivoLogo(file, (dataUrl) => {
+      logoUrlInput.value = dataUrl;
+      logoPreviewImg.src = dataUrl;
+      logoPreviewImg.style.display = 'block';
+    }, (errMsg) => mostrarAviso('No se pudo procesar la imagen', errMsg));
+  });
+
+  logoUrlInput.addEventListener('input', () => {
+    const val = logoUrlInput.value.trim();
+    if (val) { logoPreviewImg.src = val; logoPreviewImg.style.display = 'block'; }
+    else { logoPreviewImg.style.display = 'none'; }
+  });
+  logoPreviewImg.addEventListener('error', () => { logoPreviewImg.style.display = 'none'; });
+
   div.querySelector('[data-action="guardar"]').addEventListener('click', () => {
-    const nuevoNombre = div.querySelector('input[type=text]').value.trim();
-    const nuevoLogo = div.querySelector('input[type=url]').value.trim();
+    const nuevoNombre = div.querySelector('.client-name-input').value.trim();
+    const nuevoLogo = logoUrlInput.value.trim();
     const nuevoPrimario = div.querySelector('input[data-color="primario"]').value;
     const nuevoSecundario = div.querySelector('input[data-color="secundario"]').value;
     if (!nuevoNombre) return;
@@ -1270,6 +1343,27 @@ function crearTarjetaCliente(c) {
   return div;
 }
 
+document.getElementById('c-logo').addEventListener('input', (e) => {
+  const val = e.target.value.trim();
+  const preview = document.getElementById('c-logo-preview');
+  const row = document.getElementById('c-logo-preview-row');
+  if (val) { preview.src = val; row.style.display = 'block'; }
+  else { row.style.display = 'none'; }
+});
+document.getElementById('c-logo-preview').addEventListener('error', () => {
+  document.getElementById('c-logo-preview-row').style.display = 'none';
+});
+
+document.getElementById('c-logo-file').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  procesarArchivoLogo(file, (dataUrl) => {
+    document.getElementById('c-logo').value = dataUrl;
+    document.getElementById('c-logo-preview').src = dataUrl;
+    document.getElementById('c-logo-preview-row').style.display = 'block';
+  }, (errMsg) => mostrarAviso('No se pudo procesar la imagen', errMsg));
+});
+
 document.getElementById('client-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const nombre = document.getElementById('c-nombre').value.trim();
@@ -1290,6 +1384,8 @@ document.getElementById('client-form').addEventListener('submit', (e) => {
       document.getElementById('c-activo').checked = true;
       document.getElementById('c-color-primario').value = '#0c3b57';
       document.getElementById('c-color-secundario').value = '#1f6fa8';
+      document.getElementById('c-logo-preview-row').style.display = 'none';
+      document.getElementById('c-logo-file').value = '';
     })
     .catch((err) => {
       console.error(err);
