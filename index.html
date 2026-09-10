@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Portal · Tableros</title>
+<script>
+  // aplica el modo oscuro guardado ANTES de pintar, para evitar el parpadeo claro→oscuro
+  if (localStorage.getItem('portal-modo-oscuro') === '1') {
+    document.documentElement.classList.add('dark-mode');
+  }
+</script>
 <link rel="icon" type="image/svg+xml" id="favicon-link" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230c3b57'/%3E%3Ctext x='24' y='46' font-family='Georgia, serif' font-style='italic' font-weight='600' font-size='38' fill='%23ffffff'%3EP%3C/text%3E%3Ccircle cx='47' cy='19' r='5.5' fill='%231f6fa8'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,6 +32,13 @@
     --text: #16232f;
     --text-dim: #6b7684;
     --radius: 14px;
+  }
+  html.dark-mode{
+    --surface: #1b232c;
+    --surface-2: #212b35;
+    --line: #303c47;
+    --text: #eef1f4;
+    --text-dim: #96a3b0;
   }
   *{box-sizing:border-box;}
   body{margin:0;}
@@ -145,6 +158,43 @@
   .tab-btn:hover:not(.active){ border-color:var(--leaf); color:var(--text); }
   .tab-btn.active{ background:var(--gold); color:#ffffff; border-color:var(--gold); font-weight:600; }
 
+  /* ---------- LAYOUT: BARRA LATERAL + ÁREA PRINCIPAL ---------- */
+  #app-shell{ display:flex; min-height:100vh; }
+  #sidebar{
+    width:230px; flex-shrink:0; background:var(--gold);
+    display:flex; flex-direction:column; padding:26px 0 20px;
+    position:sticky; top:0; height:100vh; overflow-y:auto;
+    box-shadow:2px 0 8px rgba(16,24,32,0.06);
+    z-index:3;
+  }
+  #sidebar-brand{ padding:0 22px 26px; }
+  #sidebar-brand .wordmark{ color:#ffffff; font-size:1.3rem; margin:0; }
+  #sidebar-brand .wordmark span{ color:rgba(255,255,255,0.65) !important; }
+  #sidebar-brand .brand-logo{
+    background:#ffffff; padding:6px 10px; border-radius:8px;
+  }
+  #sidebar-brand .brand-client-name{ color:rgba(255,255,255,0.7); border-left-color:rgba(255,255,255,0.3); }
+  #sidebar-nav{ flex-direction:column; gap:3px; padding:0 14px; margin:0; }
+  #sidebar-nav .tab-btn{
+    background:transparent; border:none; color:rgba(255,255,255,0.72);
+    text-align:left; padding:11px 14px; border-radius:8px; font-size:0.9rem;
+    display:flex; align-items:center; gap:10px; width:100%;
+  }
+  #sidebar-nav .tab-btn:hover:not(.active){ background:rgba(255,255,255,0.09); color:#ffffff; border-color:transparent; }
+  #sidebar-nav .tab-btn.active{ background:rgba(255,255,255,0.18); color:#ffffff; border-color:transparent; }
+  .tab-icon{ font-size:1rem; }
+  #main-area{ flex:1; min-width:0; }
+
+  @media (max-width:820px){
+    #app-shell{ flex-direction:column; }
+    #sidebar{
+      width:100%; height:auto; position:static; flex-direction:row;
+      align-items:center; padding:16px 20px; flex-wrap:wrap; gap:10px;
+    }
+    #sidebar-brand{ padding:0; margin-right:auto; }
+    #sidebar-nav{ flex-direction:row; flex-wrap:wrap; padding:0; }
+  }
+
   .user-form input[type=email], .user-form input[type=password]{
     width:100%; padding:12px 14px;
     background:var(--surface); border:1px solid var(--line);
@@ -184,9 +234,32 @@
   }
   .actividad-tipo.login{ background:#e3f0e8; color:#1f7a4a; }
   .actividad-tipo.tablero{ background:#e6eef5; color:var(--leaf); }
+  .actividad-tipo.creado{ background:#e6eef5; color:var(--leaf); }
+  .actividad-tipo.editado{ background:#fbf1de; color:#96741a; }
+  .actividad-tipo.eliminado{ background:#fbe7e5; color:#b5382c; }
   .actividad-card{
     background:var(--surface); border:1px solid var(--line);
     border-radius:var(--radius); overflow:hidden;
+  }
+  .notif-badge{
+    position:absolute; top:-4px; right:-4px;
+    background:#c0392b; color:#ffffff; font-size:0.62rem; font-weight:700;
+    min-width:16px; height:16px; border-radius:20px;
+    display:flex; align-items:center; justify-content:center; padding:0 4px; line-height:1;
+  }
+  .notif-dropdown{
+    position:absolute; top:calc(100% + 10px); right:0; width:300px;
+    background:var(--surface); border:1px solid var(--line); border-radius:12px;
+    box-shadow:0 12px 28px rgba(16,24,32,0.16); z-index:15;
+    max-height:360px; overflow-y:auto; padding:6px 0;
+  }
+  .notif-dropdown .notif-row{ padding:10px 16px; border-bottom:1px solid var(--line); font-size:0.82rem; }
+  .notif-dropdown .notif-row:last-child{ border-bottom:none; }
+  .notif-dropdown .notif-empty{ padding:22px 16px; text-align:center; color:var(--text-dim); font-size:0.85rem; }
+  .notif-dropdown .notif-footer{ padding:8px 16px 4px; text-align:center; border-top:1px solid var(--line); margin-top:4px; }
+  .notif-dropdown .notif-footer button{
+    background:none; border:none; color:var(--leaf); font-size:0.8rem;
+    cursor:pointer; font-family:'Work Sans', sans-serif; padding:8px 0;
   }
   .btn-danger-outline{
     background:transparent; border:1px solid #e2a6a0; color:#c0392b;
@@ -217,7 +290,7 @@
   .client-card label{ display:block; font-size:0.78rem; color:var(--text-dim); margin:0 0 6px 2px; }
   .client-card input[type=text]{
     width:100%; padding:11px 13px; margin:0;
-    background:#ffffff; border:1px solid var(--line);
+    background:var(--surface); border:1px solid var(--line);
     border-radius:8px; color:var(--text); font-size:0.9rem;
     font-family:'Work Sans', sans-serif;
   }
@@ -256,9 +329,11 @@
   /* ---------- PORTAL ---------- */
   #portal-screen{ position:relative; z-index:1; display:none; min-height:100vh; }
   header{
-    display:flex; align-items:center; justify-content:space-between;
-    padding:22px 36px; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; justify-content:flex-end;
+    padding:20px 36px; border-bottom:1px solid var(--line);
     background:var(--header-bg);
+    box-shadow:0 1px 3px rgba(16,24,32,0.03);
+    position:relative; z-index:2;
   }
   header .wordmark{ font-size:1.4rem; margin:0; }
   #header-brand{ display:flex; align-items:center; gap:12px; }
@@ -310,7 +385,8 @@
     padding:22px;
     text-decoration:none; color:var(--text);
     display:flex; flex-direction:column; gap:10px;
-    transition:transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    box-shadow:0 1px 2px rgba(16,24,32,0.04);
+    transition:transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
     opacity:0; transform:translateY(6px);
     animation:rise 0.4s ease forwards;
   }
@@ -319,6 +395,7 @@
     transform:translateY(-3px);
     border-color:var(--leaf);
     background:var(--surface-2);
+    box-shadow:0 8px 20px rgba(16,24,32,0.08);
   }
   .card .icon{ font-size:1.6rem; }
   .card .name{ font-size:1.05rem; font-weight:600; font-family:'Fraunces', serif; }
@@ -393,7 +470,7 @@
   }
   input[type=text], input[type=url]{
     width:100%; padding:12px 14px; margin-bottom:16px;
-    background:#ffffff; border:1px solid var(--line);
+    background:var(--surface); border:1px solid var(--line);
     border-radius:8px; color:var(--text); font-size:0.9rem;
     font-family:'Work Sans', sans-serif;
   }
@@ -503,32 +580,44 @@
 
 <!-- ===================== PORTAL ===================== -->
 <section id="portal-screen">
-  <header>
-    <div id="header-brand">
-      <p class="wordmark display" id="brand-wordmark">Portal<span style="color:var(--gold)">.</span></p>
-    </div>
-    <div class="user-chip">
-      <span id="user-email" class="mono"></span>
-      <button class="btn-ghost" id="logout-btn">Cerrar sesión</button>
-    </div>
-  </header>
-  <main>
-    <div class="tabs">
-      <button type="button" class="tab-btn active" data-tab="tableros">Tableros</button>
-      <button type="button" class="tab-btn" data-tab="clientes" id="tab-clientes-btn" style="display:none;">Clientes</button>
-      <button type="button" class="tab-btn" data-tab="usuarios" id="tab-usuarios-btn" style="display:none;">Usuarios</button>
-      <button type="button" class="tab-btn" data-tab="actividad" id="tab-actividad-btn" style="display:none;">Actividad</button>
-    </div>
-
-    <div class="tab-panel" id="panel-tableros">
-      <p class="section-label">Tus tableros</p>
-      <h1 class="display">Panel de acceso</h1>
-      <div id="tablero-search-row" style="display:none; margin-bottom:20px;">
-        <input type="text" id="tablero-search" class="search-input" placeholder="Buscar tablero...">
+  <div id="app-shell">
+    <aside id="sidebar">
+      <div id="sidebar-brand">
+        <div id="header-brand">
+          <p class="wordmark display" id="brand-wordmark">Portal<span style="color:var(--gold)">.</span></p>
+        </div>
       </div>
-      <div id="favoritos-section" style="display:none; margin-bottom:32px;">
-        <p class="section-label">★ Favoritos</p>
-        <div class="grid" id="grid-favoritos"></div>
+      <nav class="tabs" id="sidebar-nav">
+        <button type="button" class="tab-btn active" data-tab="tableros"><span class="tab-icon">🗂️</span> Tableros</button>
+        <button type="button" class="tab-btn" data-tab="clientes" id="tab-clientes-btn" style="display:none;"><span class="tab-icon">🏢</span> Clientes</button>
+        <button type="button" class="tab-btn" data-tab="usuarios" id="tab-usuarios-btn" style="display:none;"><span class="tab-icon">👤</span> Usuarios</button>
+        <button type="button" class="tab-btn" data-tab="actividad" id="tab-actividad-btn" style="display:none;"><span class="tab-icon">📋</span> Actividad</button>
+      </nav>
+    </aside>
+    <div id="main-area">
+      <header>
+        <div class="user-chip">
+          <div style="position:relative;">
+            <button type="button" class="icon-btn" id="notif-btn" title="Actividad reciente" style="position:static; display:none;">
+              🔔<span id="notif-badge" class="notif-badge" style="display:none;"></span>
+            </button>
+            <div id="notif-dropdown" class="notif-dropdown" style="display:none;"></div>
+          </div>
+          <button type="button" class="icon-btn" id="dark-mode-btn" title="Modo oscuro" style="position:static;">🌙</button>
+          <span id="user-email" class="mono"></span>
+          <button class="btn-ghost" id="logout-btn">Cerrar sesión</button>
+        </div>
+      </header>
+      <main>
+        <div class="tab-panel" id="panel-tableros">
+          <p class="section-label">Tus tableros</p>
+          <h1 class="display">Panel de acceso</h1>
+          <div id="tablero-search-row" style="display:none; margin-bottom:20px;">
+            <input type="text" id="tablero-search" class="search-input" placeholder="Buscar tablero...">
+          </div>
+          <div id="favoritos-section" style="display:none; margin-bottom:32px;">
+            <p class="section-label">★ Favoritos</p>
+            <div class="grid" id="grid-favoritos"></div>
       </div>
       <div class="grid" id="grid">
         <div class="card add-card" id="add-card-btn">
@@ -588,19 +677,16 @@
 
     <div class="tab-panel" id="panel-usuarios" style="display:none;">
       <p class="section-label">Administración</p>
-      <h1 class="display">Crear usuario</h1>
+      <h1 class="display">Invitar usuario</h1>
       <form id="user-form" class="user-form">
         <div class="user-form-row">
-          <div>
+          <div style="flex:2;">
             <label for="u-email">Email</label>
             <input type="email" id="u-email" required>
           </div>
-          <div>
-            <label for="u-password">Contraseña</label>
-            <input type="password" id="u-password" required minlength="6">
-          </div>
-          <button type="submit" class="login-submit" id="user-create-btn" style="width:auto; padding:12px 24px;">Crear</button>
+          <button type="submit" class="login-submit" id="user-create-btn" style="width:auto; padding:12px 24px;">Invitar</button>
         </div>
+        <p style="color:var(--text-dim); font-size:0.8rem; margin:-10px 0 16px 0;">Se le enviará un correo para que defina su propia contraseña. Tú nunca ves ni eliges su contraseña.</p>
         <p id="user-form-error" class="form-error"></p>
       </form>
 
@@ -611,7 +697,7 @@
     <div class="tab-panel" id="panel-actividad" style="display:none;">
       <p class="section-label">Administración</p>
       <h1 class="display">Registro de actividad</h1>
-      <p style="color:var(--text-dim); font-size:0.85rem; margin:-20px 0 24px 0;">Muestra los últimos 200 eventos: inicios de sesión y aperturas de tableros.</p>
+      <p style="color:var(--text-dim); font-size:0.85rem; margin:-20px 0 24px 0;">Muestra los últimos 200 eventos: inicios de sesión, aperturas de tableros, y creación/edición/eliminación de tableros.</p>
       <div id="actividad-list"></div>
       <div class="empty-state" id="actividad-empty" style="display:none;">
         <span class="display">Aún no hay actividad registrada</span>
@@ -619,6 +705,8 @@
       </div>
     </div>
   </main>
+    </div>
+  </div>
 </section>
 
 <!-- ===================== VISOR EMBEBIDO ===================== -->
@@ -720,6 +808,22 @@ document.getElementById('logout-btn').addEventListener('click', () => {
   auth.signOut();
 });
 
+function actualizarBotonModoOscuro() {
+  const activo = document.documentElement.classList.contains('dark-mode');
+  const btn = document.getElementById('dark-mode-btn');
+  btn.textContent = activo ? '☀️' : '🌙';
+  btn.title = activo ? 'Modo claro' : 'Modo oscuro';
+}
+actualizarBotonModoOscuro();
+
+document.getElementById('dark-mode-btn').addEventListener('click', () => {
+  const activo = !document.documentElement.classList.contains('dark-mode');
+  document.documentElement.classList.toggle('dark-mode', activo);
+  localStorage.setItem('portal-modo-oscuro', activo ? '1' : '0');
+  actualizarBotonModoOscuro();
+  aplicarTema(temaActual); // recalcula fondo/header con la base clara/oscura correspondiente
+});
+
 auth.onAuthStateChanged((user) => {
   if (user) {
     loginScreen.style.display = 'none';
@@ -737,6 +841,10 @@ auth.onAuthStateChanged((user) => {
     if (unsubscribe) { unsubscribe(); unsubscribe = null; }
     if (unsubscribeUsuarios) { unsubscribeUsuarios(); unsubscribeUsuarios = null; }
     if (unsubscribeActividad) { unsubscribeActividad(); unsubscribeActividad = null; }
+    todasLasActividades = [];
+    document.getElementById('notif-btn').style.display = 'none';
+    document.getElementById('notif-badge').style.display = 'none';
+    document.getElementById('notif-dropdown').style.display = 'none';
   }
 });
 
@@ -793,6 +901,7 @@ function despuesDePerfil() {
   document.getElementById('tab-usuarios-btn').style.display = esAdmin ? 'inline-block' : 'none';
   document.getElementById('tab-clientes-btn').style.display = esAdmin ? 'inline-block' : 'none';
   document.getElementById('tab-actividad-btn').style.display = esAdmin ? 'inline-block' : 'none';
+  document.getElementById('notif-btn').style.display = esAdmin ? 'flex' : 'none';
   addCardBtn.style.display = esAdmin ? 'flex' : 'none';
   aplicarTemaSegunPerfil();
   escucharTableros();
@@ -979,7 +1088,10 @@ function crearTarjeta(id, data, esAdmin, esFavorito, arrastrable) {
         `¿Eliminar "${data.nombre}" del portal? Esta acción no se puede deshacer.`,
         { textoConfirmar: 'Eliminar', peligroso: true }
       );
-      if (ok) db.collection(COLLECTION).doc(id).delete();
+      if (ok) {
+        db.collection(COLLECTION).doc(id).delete()
+          .then(() => registrarActividad('tablero_eliminado', { tableroNombre: data.nombre }));
+      }
     });
   }
   a.addEventListener('dragstart', (e) => {
@@ -1133,12 +1245,16 @@ dashForm.addEventListener('submit', (e) => {
   saveBtn.disabled = true;
   saveBtn.textContent = 'Guardando...';
 
+  const esNuevo = !editingId;
   const promise = editingId
     ? db.collection(COLLECTION).doc(editingId).update(payload)
     : db.collection(COLLECTION).add({ ...payload, creado: firebase.firestore.FieldValue.serverTimestamp() });
 
   promise
-    .then(() => cerrarModal())
+    .then(() => {
+      registrarActividad(esNuevo ? 'tablero_creado' : 'tablero_editado', { tableroNombre: payload.nombre });
+      cerrarModal();
+    })
     .catch((err) => { console.error(err); mostrarAviso('No se pudo guardar', 'Ocurrió un error al guardar el tablero. Revisa la consola para más detalles.'); })
     .finally(() => { saveBtn.disabled = false; saveBtn.textContent = 'Guardar'; });
 });
@@ -1161,8 +1277,11 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
 
 /* ======================================================================
    6) ADMINISTRACIÓN DE USUARIOS (solo visible para rol "admin")
-   - Crear cuentas nuevas (usa una instancia secundaria de Firebase para
-     no cerrar la sesión del admin que está creando el usuario).
+   - Invita cuentas nuevas por correo: se crea la cuenta con una contraseña
+     aleatoria que NADIE ve (ni el admin, ni queda guardada en ningún lado),
+     y se le envía al usuario un correo de Firebase para que defina su
+     propia contraseña. Usa una instancia secundaria de Firebase para no
+     cerrar la sesión del admin mientras se crea la cuenta.
    - Asignar rol (admin / analista).
    - Asignar qué tableros puede ver cada analista.
    Nota de seguridad: esto controla lo que la INTERFAZ muestra. La
@@ -1215,7 +1334,10 @@ function crearTarjetaUsuario(u) {
         <span class="user-email">${escapeHtml(u.email)}</span>${esTu ? ' <span class="tag-tu">tú</span>' : ''}
         <div class="user-date mono">Creado el ${fecha}</div>
       </div>
-      <button type="button" class="btn-danger-outline" data-action="quitar">Quitar acceso</button>
+      <div style="display:flex; gap:8px; flex-shrink:0;">
+        <button type="button" class="btn-outline-leaf" data-action="reenviar">Reenviar acceso</button>
+        <button type="button" class="btn-danger-outline" data-action="quitar">Quitar acceso</button>
+      </div>
     </div>
     <div class="user-section-label">Rol</div>
     <div class="check-row">
@@ -1248,6 +1370,18 @@ function crearTarjetaUsuario(u) {
       const campo = { clientes: firebase.firestore.FieldValue[chk.checked ? 'arrayUnion' : 'arrayRemove'](chk.dataset.cliente) };
       ref.update(campo);
     });
+  });
+
+  div.querySelector('[data-action="reenviar"]').addEventListener('click', () => {
+    auth.sendPasswordResetEmail(u.email, {
+      url: window.location.origin + window.location.pathname,
+      handleCodeInApp: false
+    })
+      .then(() => mostrarAviso('Correo enviado', `Se envió un correo a ${u.email} con instrucciones para definir su contraseña.`))
+      .catch((err) => {
+        console.error(err);
+        mostrarAviso('No se pudo enviar', 'Ocurrió un error al enviar el correo. Revisa la consola para más detalles.');
+      });
   });
 
   div.querySelector('[data-action="quitar"]').addEventListener('click', async () => {
@@ -1307,13 +1441,92 @@ function procesarArchivoLogo(file, onListo, onError) {
    6a) REGISTRO DE ACTIVIDAD (solo visible para rol "admin")
    Muestra los últimos 200 eventos: inicios de sesión y aperturas de tableros.
 ====================================================================== */
+let todasLasActividades = [];
+
 function escucharActividad() {
   if (unsubscribeActividad) return;
   unsubscribeActividad = db.collection(ACTIVIDAD).orderBy('fecha', 'desc').limit(200)
     .onSnapshot((snapshot) => {
-      renderActividad(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      todasLasActividades = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderActividad(todasLasActividades);
+      actualizarBadgeNotificaciones();
     }, (err) => console.error('Error leyendo actividad:', err));
 }
+
+/* ---- Campana de notificaciones: cuenta actividad de OTROS usuarios desde
+   la última vez que este admin abrió el desplegable ---- */
+function claveVistaNotificaciones() {
+  return perfilActual ? `portal-actividad-vista-${perfilActual.uid}` : null;
+}
+
+function actualizarBadgeNotificaciones() {
+  const badge = document.getElementById('notif-badge');
+  if (!perfilActual || perfilActual.rol !== 'admin') { badge.style.display = 'none'; return; }
+  const vistaEn = Number(localStorage.getItem(claveVistaNotificaciones()) || 0);
+  const nuevos = todasLasActividades.filter((ev) =>
+    ev.uid !== perfilActual.uid && ev.fecha && ev.fecha.toMillis && ev.fecha.toMillis() > vistaEn
+  ).length;
+  badge.textContent = nuevos > 9 ? '9+' : String(nuevos);
+  badge.style.display = nuevos > 0 ? 'flex' : 'none';
+}
+
+/* ---- Traduce un evento de actividad a texto/etiqueta legible, según su tipo ---- */
+function describirEventoActividad(ev) {
+  const nombre = escapeHtml(ev.tableroNombre || 'un tablero');
+  switch (ev.tipo) {
+    case 'login': return { etiqueta: 'Inicio de sesión', clase: 'login', texto: 'inició sesión', detalle: '' };
+    case 'tablero': return { etiqueta: 'Abrió tablero', clase: 'tablero', texto: `abrió "${nombre}"`, detalle: nombre };
+    case 'tablero_creado': return { etiqueta: 'Tablero creado', clase: 'creado', texto: `creó el tablero "${nombre}"`, detalle: nombre };
+    case 'tablero_editado': return { etiqueta: 'Tablero editado', clase: 'editado', texto: `editó el tablero "${nombre}"`, detalle: nombre };
+    case 'tablero_eliminado': return { etiqueta: 'Tablero eliminado', clase: 'eliminado', texto: `eliminó el tablero "${nombre}"`, detalle: nombre };
+    default: return { etiqueta: ev.tipo || 'Evento', clase: 'tablero', texto: ev.tipo || '', detalle: nombre };
+  }
+}
+
+function renderNotifDropdown() {
+  const cont = document.getElementById('notif-dropdown');
+  const otros = todasLasActividades.filter((ev) => ev.uid !== perfilActual.uid).slice(0, 8);
+  if (!otros.length) {
+    cont.innerHTML = '<div class="notif-empty">Sin actividad reciente de otros usuarios.</div>';
+    return;
+  }
+  cont.innerHTML = otros.map((ev) => {
+    const fecha = (ev.fecha && ev.fecha.toDate) ? ev.fecha.toDate().toLocaleString('es-CO') : '—';
+    const { texto } = describirEventoActividad(ev);
+    return `
+      <div class="notif-row">
+        <strong>${escapeHtml(ev.email || 'Desconocido')}</strong> ${texto}
+        <div style="color:var(--text-dim); font-size:0.72rem; margin-top:2px;">${fecha}</div>
+      </div>
+    `;
+  }).join('') + '<div class="notif-footer"><button type="button" id="notif-ver-todo">Ver todo en Actividad →</button></div>';
+
+  document.getElementById('notif-ver-todo').addEventListener('click', () => {
+    document.getElementById('notif-dropdown').style.display = 'none';
+    document.getElementById('tab-actividad-btn').click();
+  });
+}
+
+document.getElementById('notif-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const dropdown = document.getElementById('notif-dropdown');
+  const yaAbierto = dropdown.style.display === 'block';
+  if (yaAbierto) {
+    dropdown.style.display = 'none';
+    return;
+  }
+  renderNotifDropdown();
+  dropdown.style.display = 'block';
+  localStorage.setItem(claveVistaNotificaciones(), String(Date.now()));
+  document.getElementById('notif-badge').style.display = 'none';
+});
+
+document.addEventListener('click', (e) => {
+  const dropdown = document.getElementById('notif-dropdown');
+  if (dropdown.style.display === 'block' && !dropdown.contains(e.target) && e.target.id !== 'notif-btn') {
+    dropdown.style.display = 'none';
+  }
+});
 
 function renderActividad(eventos) {
   const cont = document.getElementById('actividad-list');
@@ -1329,13 +1542,11 @@ function renderActividad(eventos) {
   card.className = 'actividad-card';
   card.innerHTML = eventos.map((ev) => {
     const fecha = (ev.fecha && ev.fecha.toDate) ? ev.fecha.toDate().toLocaleString('es-CO') : '—';
-    const esLogin = ev.tipo === 'login';
-    const etiqueta = esLogin ? 'Inicio de sesión' : 'Abrió tablero';
-    const detalle = esLogin ? '' : escapeHtml(ev.tableroNombre || 'Tablero eliminado');
+    const { etiqueta, clase, detalle } = describirEventoActividad(ev);
     return `
       <div class="actividad-row">
         <div>
-          <span class="actividad-tipo ${esLogin ? 'login' : 'tablero'}">${etiqueta}</span>
+          <span class="actividad-tipo ${clase}">${etiqueta}</span>
           <span class="actividad-quien">${escapeHtml(ev.email || 'Desconocido')}</span>
           ${detalle ? `<div class="actividad-detalle">${detalle}</div>` : ''}
         </div>
@@ -1354,27 +1565,41 @@ let unsubscribeClientes = null;
 /* ---- Tema por cliente: sobrescribe las variables CSS de color ---- */
 const TEMA_DEFAULT = { temaPrimario: '#0c3b57', temaSecundario: '#1f6fa8' };
 
-function hexATintado(hex, mezclaBlanco) {
-  const limpio = (hex || '').replace('#', '');
-  const num = parseInt(limpio.length === 3
-    ? limpio.split('').map(c => c + c).join('')
-    : limpio, 16);
-  if (isNaN(num)) return null;
-  const r = (num >> 16) & 255, g = (num >> 8) & 255, b = num & 255;
-  const mezcla = (c) => Math.round(255 * mezclaBlanco + c * (1 - mezclaBlanco));
-  return `rgb(${mezcla(r)}, ${mezcla(g)}, ${mezcla(b)})`;
+function hexATintado(hex, mezclaBase, baseHex) {
+  const aRgb = (h) => {
+    const limpio = (h || '').replace('#', '');
+    const num = parseInt(limpio.length === 3
+      ? limpio.split('').map(c => c + c).join('')
+      : limpio, 16);
+    if (isNaN(num)) return null;
+    return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+  };
+  const color = aRgb(hex);
+  const base = aRgb(baseHex || '#ffffff');
+  if (!color || !base) return null;
+  const mezcla = (c, bC) => Math.round(bC * mezclaBase + c * (1 - mezclaBase));
+  return `rgb(${mezcla(color.r, base.r)}, ${mezcla(color.g, base.g)}, ${mezcla(color.b, base.b)})`;
 }
+
+let temaActual = TEMA_DEFAULT; // se guarda para poder recalcular al cambiar claro/oscuro
 
 function aplicarTema(tema) {
   const t = tema || TEMA_DEFAULT;
+  temaActual = t;
   const primario = t.temaPrimario || TEMA_DEFAULT.temaPrimario;
   const secundario = t.temaSecundario || TEMA_DEFAULT.temaSecundario;
   document.documentElement.style.setProperty('--gold', primario);
   document.documentElement.style.setProperty('--leaf', secundario);
-  // fondo general y encabezado: tinte muy suave del color primario,
-  // para que el portal se sienta de la marca sin perder legibilidad
-  document.documentElement.style.setProperty('--bg', hexATintado(primario, 0.93) || '#eef1f4');
-  document.documentElement.style.setProperty('--header-bg', hexATintado(primario, 0.97) || '#ffffff');
+
+  const esOscuro = document.documentElement.classList.contains('dark-mode');
+  // fondo general y encabezado: tinte muy suave del color primario sobre una
+  // base clara u oscura según el modo, para que se sienta de marca sin perder legibilidad
+  const baseBg = esOscuro ? '#121920' : '#ffffff';
+  const baseHeader = esOscuro ? '#171f27' : '#ffffff';
+  const mezclaBg = esOscuro ? 0.90 : 0.93;
+  const mezclaHeader = esOscuro ? 0.94 : 0.97;
+  document.documentElement.style.setProperty('--bg', hexATintado(primario, mezclaBg, baseBg) || baseBg);
+  document.documentElement.style.setProperty('--header-bg', hexATintado(primario, mezclaHeader, baseHeader) || baseHeader);
   actualizarFavicon(primario, secundario);
 }
 
@@ -1590,15 +1815,33 @@ document.getElementById('client-form').addEventListener('submit', (e) => {
     });
 });
 
-/* --- Crear usuario nuevo (Auth + perfil en Firestore) --- */
-function crearUsuarioAuth(email, password) {
+/* --- Genera una contraseña temporal aleatoria: nunca se muestra, nunca se
+   guarda, y el usuario jamás llega a usarla — la reemplaza por la suya
+   propia al abrir el correo de invitación. --- */
+function generarPasswordTemporal() {
+  const azar = new Uint32Array(4);
+  crypto.getRandomValues(azar);
+  return Array.from(azar, (n) => n.toString(36)).join('') + 'Aa1!';
+}
+
+/* --- Invita a un usuario nuevo: crea la cuenta en Firebase Auth con una
+   contraseña aleatoria (descartada al instante) y le envía un correo de
+   restablecimiento de contraseña, para que sea el propio usuario quien
+   defina su acceso. --- */
+function crearUsuarioAuth(email) {
   // App secundaria temporal: evita cerrar la sesión del admin actual
   // al crear la nueva cuenta.
   const appSecundaria = firebase.initializeApp(firebaseConfig, 'secundaria-' + Date.now());
-  return appSecundaria.auth().createUserWithEmailAndPassword(email, password)
+  return appSecundaria.auth().createUserWithEmailAndPassword(email, generarPasswordTemporal())
     .then((cred) => {
       const uid = cred.user.uid;
-      return appSecundaria.auth().signOut().then(() => appSecundaria.delete()).then(() => uid);
+      return appSecundaria.auth().signOut()
+        .then(() => appSecundaria.delete())
+        .then(() => auth.sendPasswordResetEmail(email, {
+          url: window.location.origin + window.location.pathname,
+          handleCodeInApp: false
+        }))
+        .then(() => uid);
     })
     .catch((err) => {
       appSecundaria.delete().catch(() => {});
@@ -1611,21 +1854,20 @@ function traducirErrorAuth(err) {
     case 'auth/email-already-in-use': return 'Ese correo ya tiene una cuenta.';
     case 'auth/weak-password': return 'La contraseña debe tener al menos 6 caracteres.';
     case 'auth/invalid-email': return 'El correo no es válido.';
-    default: return 'No se pudo crear el usuario. Revisa la consola.';
+    default: return 'No se pudo invitar al usuario. Revisa la consola.';
   }
 }
 
 document.getElementById('user-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const email = document.getElementById('u-email').value.trim();
-  const password = document.getElementById('u-password').value;
   const errorEl = document.getElementById('user-form-error');
   const btn = document.getElementById('user-create-btn');
   errorEl.textContent = '';
   btn.disabled = true;
-  btn.textContent = 'Creando...';
+  btn.textContent = 'Invitando...';
 
-  crearUsuarioAuth(email, password)
+  crearUsuarioAuth(email)
     .then((uid) => db.collection(PERFILES).doc(uid).set({
       email,
       rol: 'analista',
@@ -1635,6 +1877,7 @@ document.getElementById('user-form').addEventListener('submit', (e) => {
     }))
     .then(() => {
       document.getElementById('user-form').reset();
+      mostrarAviso('Invitación enviada', `Se envió un correo a ${email} con instrucciones para definir su contraseña y entrar al portal.`);
     })
     .catch((err) => {
       console.error(err);
@@ -1642,7 +1885,7 @@ document.getElementById('user-form').addEventListener('submit', (e) => {
     })
     .finally(() => {
       btn.disabled = false;
-      btn.textContent = 'Crear';
+      btn.textContent = 'Invitar';
     });
 });
 </script>
