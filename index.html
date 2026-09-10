@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Portal · Tableros</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230c3b57'/%3E%3Ctext x='24' y='46' font-family='Georgia, serif' font-style='italic' font-weight='600' font-size='38' fill='%23ffffff'%3EP%3C/text%3E%3Ccircle cx='47' cy='19' r='5.5' fill='%231f6fa8'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -200,6 +201,13 @@
     font-family:'Work Sans', sans-serif;
   }
   .client-card input[type=text]:focus{ outline:none; border-color:var(--leaf); }
+  input[type=color].color-input{
+    width:44px; height:44px; padding:2px; margin:0;
+    background:#ffffff; border:1px solid var(--line);
+    border-radius:8px; cursor:pointer;
+  }
+  .client-card .color-field{ flex:0 0 auto; }
+  .client-card .color-field label{ text-align:center; }
   .btn-outline-leaf{
     background:transparent; border:1px solid var(--leaf); color:var(--leaf);
     padding:10px 16px; border-radius:8px; font-size:0.85rem;
@@ -471,6 +479,14 @@
             <label for="c-nombre">Nombre</label>
             <input type="text" id="c-nombre" required>
           </div>
+          <div style="flex:0 0 auto;">
+            <label for="c-color-primario">Color primario</label>
+            <input type="color" id="c-color-primario" class="color-input" value="#0c3b57">
+          </div>
+          <div style="flex:0 0 auto;">
+            <label for="c-color-secundario">Color secundario</label>
+            <input type="color" id="c-color-secundario" class="color-input" value="#1f6fa8">
+          </div>
           <label class="check-inline">
             <input type="checkbox" id="c-activo" checked> Activo
           </label>
@@ -604,6 +620,7 @@ auth.onAuthStateChanged((user) => {
     loginScreen.style.display = 'flex';
     portalScreen.style.display = 'none';
     perfilActual = null;
+    aplicarTema(TEMA_DEFAULT);
     if (unsubscribe) { unsubscribe(); unsubscribe = null; }
     if (unsubscribeUsuarios) { unsubscribeUsuarios(); unsubscribeUsuarios = null; }
   }
@@ -648,6 +665,7 @@ function despuesDePerfil() {
   document.getElementById('tab-usuarios-btn').style.display = esAdmin ? 'inline-block' : 'none';
   document.getElementById('tab-clientes-btn').style.display = esAdmin ? 'inline-block' : 'none';
   addCardBtn.style.display = esAdmin ? 'flex' : 'none';
+  aplicarTemaSegunPerfil();
   escucharTableros();
   if (esAdmin) {
     escucharUsuarios();
@@ -950,6 +968,32 @@ const CLIENTES = "vivero_clientes";
 let todosClientes = [];
 let unsubscribeClientes = null;
 
+/* ---- Tema por cliente: sobrescribe las variables CSS de color ---- */
+const TEMA_DEFAULT = { temaPrimario: '#0c3b57', temaSecundario: '#1f6fa8' };
+
+function aplicarTema(tema) {
+  const t = tema || TEMA_DEFAULT;
+  document.documentElement.style.setProperty('--gold', t.temaPrimario || TEMA_DEFAULT.temaPrimario);
+  document.documentElement.style.setProperty('--leaf', t.temaSecundario || TEMA_DEFAULT.temaSecundario);
+}
+
+function aplicarTemaSegunPerfil() {
+  if (!perfilActual) { aplicarTema(TEMA_DEFAULT); return; }
+  const primerClienteId = (perfilActual.clientes || [])[0];
+  if (perfilActual.rol === 'admin' || !primerClienteId) {
+    aplicarTema(TEMA_DEFAULT);
+    return;
+  }
+  db.collection(CLIENTES).doc(primerClienteId).get()
+    .then((snap) => {
+      aplicarTema(snap.exists ? snap.data() : TEMA_DEFAULT);
+    })
+    .catch((err) => {
+      console.error('Error cargando tema del cliente:', err);
+      aplicarTema(TEMA_DEFAULT);
+    });
+}
+
 function escucharClientes() {
   if (unsubscribeClientes) return;
   unsubscribeClientes = db.collection(CLIENTES).orderBy('creado', 'asc')
@@ -976,6 +1020,14 @@ function crearTarjetaCliente(c) {
       <label>Nombre</label>
       <input type="text" value="${escapeHtml(c.nombre)}">
     </div>
+    <div class="color-field">
+      <label>Primario</label>
+      <input type="color" class="color-input" data-color="primario" value="${c.temaPrimario || '#0c3b57'}">
+    </div>
+    <div class="color-field">
+      <label>Secundario</label>
+      <input type="color" class="color-input" data-color="secundario" value="${c.temaSecundario || '#1f6fa8'}">
+    </div>
     <button type="button" class="btn-outline-leaf" data-action="guardar">Guardar</button>
     <span class="pill ${c.activo ? 'pill-active' : 'pill-inactive'}">${c.activo ? 'Activo' : 'Inactivo'}</span>
     <button type="button" class="btn-toggle" data-action="toggle">${c.activo ? 'Desactivar' : 'Activar'}</button>
@@ -983,8 +1035,19 @@ function crearTarjetaCliente(c) {
 
   div.querySelector('[data-action="guardar"]').addEventListener('click', () => {
     const nuevoNombre = div.querySelector('input[type=text]').value.trim();
+    const nuevoPrimario = div.querySelector('input[data-color="primario"]').value;
+    const nuevoSecundario = div.querySelector('input[data-color="secundario"]').value;
     if (!nuevoNombre) return;
-    db.collection(CLIENTES).doc(c.id).update({ nombre: nuevoNombre });
+    db.collection(CLIENTES).doc(c.id).update({
+      nombre: nuevoNombre,
+      temaPrimario: nuevoPrimario,
+      temaSecundario: nuevoSecundario
+    }).then(() => {
+      // si el cliente editado es el que define el tema activo, refréscalo
+      if (perfilActual && perfilActual.rol !== 'admin' && (perfilActual.clientes || [])[0] === c.id) {
+        aplicarTema({ temaPrimario: nuevoPrimario, temaSecundario: nuevoSecundario });
+      }
+    });
   });
 
   div.querySelector('[data-action="toggle"]').addEventListener('click', () => {
@@ -998,6 +1061,8 @@ document.getElementById('client-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const nombre = document.getElementById('c-nombre').value.trim();
   const activo = document.getElementById('c-activo').checked;
+  const temaPrimario = document.getElementById('c-color-primario').value;
+  const temaSecundario = document.getElementById('c-color-secundario').value;
   const errorEl = document.getElementById('client-form-error');
   const btn = document.getElementById('client-create-btn');
   errorEl.textContent = '';
@@ -1005,10 +1070,12 @@ document.getElementById('client-form').addEventListener('submit', (e) => {
   btn.disabled = true;
   btn.textContent = 'Creando...';
 
-  db.collection(CLIENTES).add({ nombre, activo, creado: firebase.firestore.FieldValue.serverTimestamp() })
+  db.collection(CLIENTES).add({ nombre, activo, temaPrimario, temaSecundario, creado: firebase.firestore.FieldValue.serverTimestamp() })
     .then(() => {
       document.getElementById('client-form').reset();
       document.getElementById('c-activo').checked = true;
+      document.getElementById('c-color-primario').value = '#0c3b57';
+      document.getElementById('c-color-secundario').value = '#1f6fa8';
     })
     .catch((err) => {
       console.error(err);
