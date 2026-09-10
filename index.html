@@ -22,6 +22,7 @@
     --line: #dde2e7;
     --gold: #0c3b57;
     --leaf: #1f6fa8;
+    --header-bg: #ffffff;
     --text: #16232f;
     --text-dim: #6b7684;
     --radius: 14px;
@@ -232,7 +233,7 @@
   header{
     display:flex; align-items:center; justify-content:space-between;
     padding:22px 36px; border-bottom:1px solid var(--line);
-    background:#ffffff;
+    background:var(--header-bg);
   }
   header .wordmark{ font-size:1.4rem; margin:0; }
   .user-chip{
@@ -971,10 +972,27 @@ let unsubscribeClientes = null;
 /* ---- Tema por cliente: sobrescribe las variables CSS de color ---- */
 const TEMA_DEFAULT = { temaPrimario: '#0c3b57', temaSecundario: '#1f6fa8' };
 
+function hexATintado(hex, mezclaBlanco) {
+  const limpio = (hex || '').replace('#', '');
+  const num = parseInt(limpio.length === 3
+    ? limpio.split('').map(c => c + c).join('')
+    : limpio, 16);
+  if (isNaN(num)) return null;
+  const r = (num >> 16) & 255, g = (num >> 8) & 255, b = num & 255;
+  const mezcla = (c) => Math.round(255 * mezclaBlanco + c * (1 - mezclaBlanco));
+  return `rgb(${mezcla(r)}, ${mezcla(g)}, ${mezcla(b)})`;
+}
+
 function aplicarTema(tema) {
   const t = tema || TEMA_DEFAULT;
-  document.documentElement.style.setProperty('--gold', t.temaPrimario || TEMA_DEFAULT.temaPrimario);
-  document.documentElement.style.setProperty('--leaf', t.temaSecundario || TEMA_DEFAULT.temaSecundario);
+  const primario = t.temaPrimario || TEMA_DEFAULT.temaPrimario;
+  const secundario = t.temaSecundario || TEMA_DEFAULT.temaSecundario;
+  document.documentElement.style.setProperty('--gold', primario);
+  document.documentElement.style.setProperty('--leaf', secundario);
+  // fondo general y encabezado: tinte muy suave del color primario,
+  // para que el portal se sienta de la marca sin perder legibilidad
+  document.documentElement.style.setProperty('--bg', hexATintado(primario, 0.93) || '#eef1f4');
+  document.documentElement.style.setProperty('--header-bg', hexATintado(primario, 0.97) || '#ffffff');
 }
 
 function aplicarTemaSegunPerfil() {
