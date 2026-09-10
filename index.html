@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Portal · Tableros</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230c3b57'/%3E%3Ctext x='24' y='46' font-family='Georgia, serif' font-style='italic' font-weight='600' font-size='38' fill='%23ffffff'%3EP%3C/text%3E%3Ccircle cx='47' cy='19' r='5.5' fill='%231f6fa8'/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" id="favicon-link" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230c3b57'/%3E%3Ctext x='24' y='46' font-family='Georgia, serif' font-style='italic' font-weight='600' font-size='38' fill='%23ffffff'%3EP%3C/text%3E%3Ccircle cx='47' cy='19' r='5.5' fill='%231f6fa8'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -236,6 +236,15 @@
     background:var(--header-bg);
   }
   header .wordmark{ font-size:1.4rem; margin:0; }
+  #header-brand{ display:flex; align-items:center; gap:12px; }
+  #header-brand .brand-logo{
+    height:34px; max-width:180px; object-fit:contain; display:block;
+  }
+  #header-brand .brand-client-name{
+    font-family:'IBM Plex Mono', monospace; font-size:0.8rem;
+    color:var(--text-dim); border-left:1px solid var(--line);
+    padding-left:12px; margin-left:2px;
+  }
   .user-chip{
     display:flex; align-items:center; gap:14px;
     color:var(--text-dim); font-size:0.85rem;
@@ -254,6 +263,14 @@
   main h1{
     font-size:1.7rem; font-weight:500; margin:0 0 32px 0;
   }
+  .search-input{
+    width:100%; max-width:320px; padding:11px 14px;
+    background:var(--surface); border:1px solid var(--line);
+    border-radius:8px; color:var(--text); font-size:0.9rem;
+    font-family:'Work Sans', sans-serif;
+  }
+  .search-input:focus{ outline:none; border-color:var(--leaf); }
+  .search-input::placeholder{ color:var(--text-dim); }
 
   .grid{
     display:grid;
@@ -330,6 +347,16 @@
   }
   .btn-secondary:hover{ color:var(--text); border-color:var(--text-dim); }
   .modal .btn-primary{ flex:1; padding:11px; }
+  .modal .btn-danger{
+    flex:1; padding:11px; background:#c0392b; color:#ffffff;
+    font-weight:600; font-size:0.9rem; font-family:'Work Sans', sans-serif;
+    border:none; border-radius:8px;
+  }
+  .modal .btn-danger:hover{ filter:brightness(1.1); }
+  .modal .modal-message{
+    color:var(--text-dim); font-size:0.92rem; line-height:1.55;
+    margin:0 0 22px 0; white-space:pre-line;
+  }
   input[type=text], input[type=url]{
     width:100%; padding:12px 14px; margin-bottom:16px;
     background:#ffffff; border:1px solid var(--line);
@@ -443,7 +470,9 @@
 <!-- ===================== PORTAL ===================== -->
 <section id="portal-screen">
   <header>
-    <p class="wordmark display">Portal<span style="color:var(--gold)">.</span></p>
+    <div id="header-brand">
+      <p class="wordmark display" id="brand-wordmark">Portal<span style="color:var(--gold)">.</span></p>
+    </div>
     <div class="user-chip">
       <span id="user-email" class="mono"></span>
       <button class="btn-ghost" id="logout-btn">Cerrar sesión</button>
@@ -459,6 +488,9 @@
     <div class="tab-panel" id="panel-tableros">
       <p class="section-label">Tus tableros</p>
       <h1 class="display">Panel de acceso</h1>
+      <div id="tablero-search-row" style="display:none; margin-bottom:20px;">
+        <input type="text" id="tablero-search" class="search-input" placeholder="Buscar tablero...">
+      </div>
       <div class="grid" id="grid">
         <div class="card add-card" id="add-card-btn">
           <div class="plus">+</div>
@@ -466,8 +498,8 @@
         </div>
       </div>
       <div class="empty-state" id="empty-state" style="display:none; margin-top:18px;">
-        <span class="display">Aún no has agregado ningún tablero</span>
-        Agrega el primer tablero con el botón “+”.
+        <span class="display" id="empty-state-title">Aún no has agregado ningún tablero</span>
+        <span id="empty-state-sub">Agrega el primer tablero con el botón “+”.</span>
       </div>
     </div>
 
@@ -492,6 +524,12 @@
             <input type="checkbox" id="c-activo" checked> Activo
           </label>
           <button type="submit" class="login-submit" id="client-create-btn" style="width:auto; padding:12px 24px;">Crear</button>
+        </div>
+        <div class="user-form-row">
+          <div style="flex:2;">
+            <label for="c-logo">Logo (URL, opcional — si se deja vacío se muestra el nombre)</label>
+            <input type="url" id="c-logo" placeholder="https://.../logo.png">
+          </div>
         </div>
         <p id="client-form-error" class="form-error"></p>
       </form>
@@ -553,6 +591,18 @@
         <button type="submit" class="btn-primary" id="dash-save-btn">Guardar</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- ===================== MODAL CONFIRMACIÓN / AVISO (reemplaza confirm/alert nativos) ===================== -->
+<div class="modal-overlay" id="confirm-overlay">
+  <div class="modal">
+    <h2 id="confirm-title">Confirmar</h2>
+    <p class="modal-message" id="confirm-message"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="confirm-cancel">Cancelar</button>
+      <button type="button" class="btn-primary" id="confirm-ok">Confirmar</button>
+    </div>
   </div>
 </div>
 
@@ -622,6 +672,9 @@ auth.onAuthStateChanged((user) => {
     portalScreen.style.display = 'none';
     perfilActual = null;
     aplicarTema(TEMA_DEFAULT);
+    actualizarMarcaHeader(null);
+    terminoBusquedaTableros = '';
+    tableroSearchInput.value = '';
     if (unsubscribe) { unsubscribe(); unsubscribe = null; }
     if (unsubscribeUsuarios) { unsubscribeUsuarios(); unsubscribeUsuarios = null; }
   }
@@ -680,8 +733,55 @@ function despuesDePerfil() {
 const grid = document.getElementById('grid');
 const addCardBtn = document.getElementById('add-card-btn');
 const emptyState = document.getElementById('empty-state');
+const tableroSearchRow = document.getElementById('tablero-search-row');
+const tableroSearchInput = document.getElementById('tablero-search');
 let unsubscribe = null;
 let todosTableros = []; // cache completo, usado también por la pestaña Usuarios
+let tablerosVisiblesActuales = []; // visibles según permisos, antes de aplicar la búsqueda
+let terminoBusquedaTableros = '';
+
+function coincideBusquedaTablero(t, termino) {
+  if (!termino) return true;
+  const cliente = t.clienteId ? todosClientes.find(c => c.id === t.clienteId) : null;
+  const texto = [t.nombre, t.descripcion, cliente ? cliente.nombre : '']
+    .filter(Boolean).join(' ').toLowerCase();
+  return texto.includes(termino);
+}
+
+function renderGridTableros() {
+  const esAdmin = perfilActual.rol === 'admin';
+  grid.querySelectorAll('.card:not(.add-card)').forEach(el => el.remove());
+
+  tableroSearchRow.style.display = tablerosVisiblesActuales.length > 0 ? 'block' : 'none';
+
+  const termino = terminoBusquedaTableros.trim().toLowerCase();
+  const filtrados = tablerosVisiblesActuales.filter(t => coincideBusquedaTablero(t, termino));
+
+  if (tablerosVisiblesActuales.length === 0) {
+    emptyState.style.display = 'block';
+    document.getElementById('empty-state-title').textContent = esAdmin
+      ? 'Aún no has agregado ningún tablero'
+      : 'Todavía no tienes tableros asignados';
+    document.getElementById('empty-state-sub').textContent = esAdmin
+      ? 'Agrega el primer tablero con el botón “+”.'
+      : '';
+  } else if (filtrados.length === 0) {
+    emptyState.style.display = 'block';
+    document.getElementById('empty-state-title').textContent = 'No se encontraron tableros';
+    document.getElementById('empty-state-sub').textContent = 'Prueba con otro término de búsqueda.';
+  } else {
+    emptyState.style.display = 'none';
+  }
+
+  filtrados.forEach((t) => {
+    grid.insertBefore(crearTarjeta(t.id, t, esAdmin), addCardBtn);
+  });
+}
+
+tableroSearchInput.addEventListener('input', (e) => {
+  terminoBusquedaTableros = e.target.value;
+  renderGridTableros();
+});
 
 function escucharTableros() {
   if (unsubscribe) return; // ya escuchando
@@ -689,11 +789,8 @@ function escucharTableros() {
     .onSnapshot((snapshot) => {
       todosTableros = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // limpia tarjetas existentes (deja el botón "+")
-      grid.querySelectorAll('.card:not(.add-card)').forEach(el => el.remove());
-
       const esAdmin = perfilActual.rol === 'admin';
-      const visibles = esAdmin
+      tablerosVisiblesActuales = esAdmin
         ? todosTableros
         : todosTableros.filter(t => {
             if (t.clienteId) {
@@ -702,14 +799,7 @@ function escucharTableros() {
             return (perfilActual.tableros || []).includes(t.id);
           });
 
-      emptyState.style.display = visibles.length ? 'none' : 'block';
-      emptyState.querySelector('span').textContent = esAdmin
-        ? 'Aún no has agregado ningún tablero'
-        : 'Todavía no tienes tableros asignados';
-
-      visibles.forEach((t) => {
-        grid.insertBefore(crearTarjeta(t.id, t, esAdmin), addCardBtn);
-      });
+      renderGridTableros();
 
       // si la pestaña Usuarios ya está pintada, refresca sus checkboxes de tableros
       if (esAdmin && usuariosCache.length) renderUsuarios();
@@ -739,11 +829,14 @@ function crearTarjeta(id, data, esAdmin) {
       e.stopPropagation();
       abrirModal(id, data);
     });
-    a.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
+    a.querySelector('[data-action="delete"]').addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (confirm(`¿Eliminar "${data.nombre}" del portal?`)) {
-        db.collection(COLLECTION).doc(id).delete();
-      }
+      const ok = await confirmarAccion(
+        'Eliminar tablero',
+        `¿Eliminar "${data.nombre}" del portal? Esta acción no se puede deshacer.`,
+        { textoConfirmar: 'Eliminar', peligroso: true }
+      );
+      if (ok) db.collection(COLLECTION).doc(id).delete();
     });
   }
   return a;
@@ -753,6 +846,53 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+/* ======================================================================
+   3a) DIÁLOGOS PROPIOS (reemplazan confirm()/alert() nativos del navegador)
+====================================================================== */
+const confirmOverlay = document.getElementById('confirm-overlay');
+const confirmTitle = document.getElementById('confirm-title');
+const confirmMessage = document.getElementById('confirm-message');
+const confirmCancelBtn = document.getElementById('confirm-cancel');
+const confirmOkBtn = document.getElementById('confirm-ok');
+
+function mostrarDialogo({ titulo, mensaje, textoConfirmar = 'Confirmar', peligroso = false, soloAviso = false }) {
+  return new Promise((resolve) => {
+    confirmTitle.textContent = titulo;
+    confirmMessage.textContent = mensaje;
+    confirmOkBtn.textContent = textoConfirmar;
+    confirmOkBtn.className = peligroso ? 'btn-danger' : 'btn-primary';
+    confirmCancelBtn.style.display = soloAviso ? 'none' : 'inline-block';
+    confirmOverlay.style.display = 'flex';
+
+    function limpiar(resultado) {
+      confirmOverlay.style.display = 'none';
+      confirmOkBtn.removeEventListener('click', onOk);
+      confirmCancelBtn.removeEventListener('click', onCancel);
+      confirmOverlay.removeEventListener('click', onOverlay);
+      resolve(resultado);
+    }
+    function onOk() { limpiar(true); }
+    function onCancel() { limpiar(false); }
+    function onOverlay(e) { if (e.target === confirmOverlay && !soloAviso) limpiar(false); }
+
+    confirmOkBtn.addEventListener('click', onOk);
+    confirmCancelBtn.addEventListener('click', onCancel);
+    confirmOverlay.addEventListener('click', onOverlay);
+  });
+}
+
+function confirmarAccion(titulo, mensaje, opciones = {}) {
+  return mostrarDialogo({
+    titulo, mensaje,
+    textoConfirmar: opciones.textoConfirmar || 'Confirmar',
+    peligroso: opciones.peligroso || false
+  });
+}
+
+function mostrarAviso(titulo, mensaje) {
+  return mostrarDialogo({ titulo, mensaje, textoConfirmar: 'Entendido', soloAviso: true });
 }
 
 /* ======================================================================
@@ -838,7 +978,7 @@ dashForm.addEventListener('submit', (e) => {
 
   promise
     .then(() => cerrarModal())
-    .catch((err) => { console.error(err); alert('No se pudo guardar. Revisa la consola.'); })
+    .catch((err) => { console.error(err); mostrarAviso('No se pudo guardar', 'Ocurrió un error al guardar el tablero. Revisa la consola para más detalles.'); })
     .finally(() => { saveBtn.disabled = false; saveBtn.textContent = 'Guardar'; });
 });
 
@@ -947,14 +1087,17 @@ function crearTarjetaUsuario(u) {
     });
   });
 
-  div.querySelector('[data-action="quitar"]').addEventListener('click', () => {
+  div.querySelector('[data-action="quitar"]').addEventListener('click', async () => {
     if (esTu) {
-      alert('No puedes quitarte el acceso a ti mismo desde aquí.');
+      mostrarAviso('Acción no permitida', 'No puedes quitarte el acceso a ti mismo desde aquí.');
       return;
     }
-    if (confirm(`¿Quitar el acceso de "${u.email}"? Su cuenta de acceso sigue existiendo, pero no verá ningún tablero.\n\nPara eliminar la cuenta por completo, hazlo desde Firebase Console > Authentication.`)) {
-      db.collection(PERFILES).doc(u.uid).delete();
-    }
+    const ok = await confirmarAccion(
+      'Quitar acceso',
+      `¿Quitar el acceso de "${u.email}"? Su cuenta de acceso sigue existiendo, pero no verá ningún tablero.\n\nPara eliminar la cuenta por completo, hazlo desde Firebase Console > Authentication.`,
+      { textoConfirmar: 'Quitar acceso', peligroso: true }
+    );
+    if (ok) db.collection(PERFILES).doc(u.uid).delete();
   });
 
   return div;
@@ -993,22 +1136,67 @@ function aplicarTema(tema) {
   // para que el portal se sienta de la marca sin perder legibilidad
   document.documentElement.style.setProperty('--bg', hexATintado(primario, 0.93) || '#eef1f4');
   document.documentElement.style.setProperty('--header-bg', hexATintado(primario, 0.97) || '#ffffff');
+  actualizarFavicon(primario, secundario);
+}
+
+/* ---- Favicon dinámico: misma "P" itálica, pero con el color del cliente activo ---- */
+function actualizarFavicon(primario, secundario) {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'>`
+    + `<rect width='64' height='64' rx='14' fill='${primario}'/>`
+    + `<text x='24' y='46' font-family='Georgia, serif' font-style='italic' font-weight='600' font-size='38' fill='#ffffff'>P</text>`
+    + `<circle cx='47' cy='19' r='5.5' fill='${secundario}'/>`
+    + `</svg>`;
+  const href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+  // algunos navegadores (Chrome) cachean el favicon y no lo refrescan solo con
+  // cambiar el href; reemplazar el nodo <link> fuerza la actualización visual.
+  const viejo = document.getElementById('favicon-link');
+  const nuevo = viejo.cloneNode(true);
+  nuevo.setAttribute('href', href);
+  viejo.parentNode.replaceChild(nuevo, viejo);
+}
+
+/* ---- Marca del header: logo o nombre del cliente activo ---- */
+function actualizarMarcaHeader(cliente) {
+  const cont = document.getElementById('header-brand');
+  if (!cliente) {
+    cont.innerHTML = '<p class="wordmark display" id="brand-wordmark">Portal<span style="color:var(--gold)">.</span></p>';
+    return;
+  }
+  if (cliente.logoUrl) {
+    cont.innerHTML = `<img class="brand-logo" src="${escapeHtml(cliente.logoUrl)}" alt="${escapeHtml(cliente.nombre || 'Cliente')}">`;
+    cont.querySelector('img').addEventListener('error', () => {
+      // si el logo no carga, cae a mostrar el nombre en texto
+      cont.innerHTML = `
+        <p class="wordmark display" style="font-size:1.2rem;">Portal<span style="color:var(--gold)">.</span></p>
+        <span class="brand-client-name mono">${escapeHtml(cliente.nombre || '')}</span>
+      `;
+    });
+  } else {
+    cont.innerHTML = `
+      <p class="wordmark display" style="font-size:1.2rem;">Portal<span style="color:var(--gold)">.</span></p>
+      <span class="brand-client-name mono">${escapeHtml(cliente.nombre || '')}</span>
+    `;
+  }
 }
 
 function aplicarTemaSegunPerfil() {
-  if (!perfilActual) { aplicarTema(TEMA_DEFAULT); return; }
+  if (!perfilActual) { aplicarTema(TEMA_DEFAULT); actualizarMarcaHeader(null); return; }
   const primerClienteId = (perfilActual.clientes || [])[0];
   if (perfilActual.rol === 'admin' || !primerClienteId) {
     aplicarTema(TEMA_DEFAULT);
+    actualizarMarcaHeader(null);
     return;
   }
   db.collection(CLIENTES).doc(primerClienteId).get()
     .then((snap) => {
-      aplicarTema(snap.exists ? snap.data() : TEMA_DEFAULT);
+      const cliente = snap.exists ? { id: snap.id, ...snap.data() } : null;
+      aplicarTema(cliente || TEMA_DEFAULT);
+      actualizarMarcaHeader(cliente);
     })
     .catch((err) => {
       console.error('Error cargando tema del cliente:', err);
       aplicarTema(TEMA_DEFAULT);
+      actualizarMarcaHeader(null);
     });
 }
 
@@ -1038,6 +1226,10 @@ function crearTarjetaCliente(c) {
       <label>Nombre</label>
       <input type="text" value="${escapeHtml(c.nombre)}">
     </div>
+    <div class="client-field">
+      <label>Logo (URL, opcional)</label>
+      <input type="url" value="${escapeHtml(c.logoUrl || '')}" placeholder="https://.../logo.png">
+    </div>
     <div class="color-field">
       <label>Primario</label>
       <input type="color" class="color-input" data-color="primario" value="${c.temaPrimario || '#0c3b57'}">
@@ -1053,17 +1245,20 @@ function crearTarjetaCliente(c) {
 
   div.querySelector('[data-action="guardar"]').addEventListener('click', () => {
     const nuevoNombre = div.querySelector('input[type=text]').value.trim();
+    const nuevoLogo = div.querySelector('input[type=url]').value.trim();
     const nuevoPrimario = div.querySelector('input[data-color="primario"]').value;
     const nuevoSecundario = div.querySelector('input[data-color="secundario"]').value;
     if (!nuevoNombre) return;
     db.collection(CLIENTES).doc(c.id).update({
       nombre: nuevoNombre,
+      logoUrl: nuevoLogo,
       temaPrimario: nuevoPrimario,
       temaSecundario: nuevoSecundario
     }).then(() => {
       // si el cliente editado es el que define el tema activo, refréscalo
       if (perfilActual && perfilActual.rol !== 'admin' && (perfilActual.clientes || [])[0] === c.id) {
         aplicarTema({ temaPrimario: nuevoPrimario, temaSecundario: nuevoSecundario });
+        actualizarMarcaHeader({ nombre: nuevoNombre, logoUrl: nuevoLogo });
       }
     });
   });
@@ -1081,6 +1276,7 @@ document.getElementById('client-form').addEventListener('submit', (e) => {
   const activo = document.getElementById('c-activo').checked;
   const temaPrimario = document.getElementById('c-color-primario').value;
   const temaSecundario = document.getElementById('c-color-secundario').value;
+  const logoUrl = document.getElementById('c-logo').value.trim();
   const errorEl = document.getElementById('client-form-error');
   const btn = document.getElementById('client-create-btn');
   errorEl.textContent = '';
@@ -1088,7 +1284,7 @@ document.getElementById('client-form').addEventListener('submit', (e) => {
   btn.disabled = true;
   btn.textContent = 'Creando...';
 
-  db.collection(CLIENTES).add({ nombre, activo, temaPrimario, temaSecundario, creado: firebase.firestore.FieldValue.serverTimestamp() })
+  db.collection(CLIENTES).add({ nombre, activo, temaPrimario, temaSecundario, logoUrl, creado: firebase.firestore.FieldValue.serverTimestamp() })
     .then(() => {
       document.getElementById('client-form').reset();
       document.getElementById('c-activo').checked = true;
