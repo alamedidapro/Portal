@@ -168,6 +168,26 @@
     border-radius:20px; padding:1px 8px; margin-left:6px;
   }
   .user-date{ font-size:0.78rem; color:var(--text-dim); margin-top:3px; }
+  .actividad-row{
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    padding:14px 18px; border-bottom:1px solid var(--line);
+  }
+  .actividad-row:last-child{ border-bottom:none; }
+  .actividad-row .actividad-quien{ font-weight:600; font-size:0.9rem; }
+  .actividad-row .actividad-detalle{ font-size:0.85rem; color:var(--text-dim); }
+  .actividad-row .actividad-fecha{
+    font-size:0.78rem; color:var(--text-dim); white-space:nowrap; flex-shrink:0;
+  }
+  .actividad-tipo{
+    font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em;
+    padding:2px 8px; border-radius:20px; margin-right:8px; flex-shrink:0;
+  }
+  .actividad-tipo.login{ background:#e3f0e8; color:#1f7a4a; }
+  .actividad-tipo.tablero{ background:#e6eef5; color:var(--leaf); }
+  .actividad-card{
+    background:var(--surface); border:1px solid var(--line);
+    border-radius:var(--radius); overflow:hidden;
+  }
   .btn-danger-outline{
     background:transparent; border:1px solid #e2a6a0; color:#c0392b;
     padding:7px 14px; border-radius:8px; font-size:0.82rem;
@@ -320,6 +340,15 @@
     display:flex; align-items:center; justify-content:center;
   }
   .icon-btn:hover{ color:var(--text); border-color:var(--leaf); }
+  .fav-btn{
+    position:absolute; top:14px; left:14px; z-index:2;
+    font-size:0.85rem; opacity:0.55; transition:opacity 0.15s ease;
+  }
+  .card:hover .fav-btn, .fav-btn.is-fav{ opacity:1; }
+  .fav-btn.is-fav{ background:#fff6e0; border-color:#f0d68c; color:#c9971b; }
+  .card[draggable="true"]{ cursor:grab; }
+  .card[draggable="true"]:active{ cursor:grabbing; }
+  .card.dragging{ opacity:0.4; }
 
   .card.add-card{
     border-style:dashed; align-items:center; justify-content:center;
@@ -488,6 +517,7 @@
       <button type="button" class="tab-btn active" data-tab="tableros">Tableros</button>
       <button type="button" class="tab-btn" data-tab="clientes" id="tab-clientes-btn" style="display:none;">Clientes</button>
       <button type="button" class="tab-btn" data-tab="usuarios" id="tab-usuarios-btn" style="display:none;">Usuarios</button>
+      <button type="button" class="tab-btn" data-tab="actividad" id="tab-actividad-btn" style="display:none;">Actividad</button>
     </div>
 
     <div class="tab-panel" id="panel-tableros">
@@ -495,6 +525,10 @@
       <h1 class="display">Panel de acceso</h1>
       <div id="tablero-search-row" style="display:none; margin-bottom:20px;">
         <input type="text" id="tablero-search" class="search-input" placeholder="Buscar tablero...">
+      </div>
+      <div id="favoritos-section" style="display:none; margin-bottom:32px;">
+        <p class="section-label">★ Favoritos</p>
+        <div class="grid" id="grid-favoritos"></div>
       </div>
       <div class="grid" id="grid">
         <div class="card add-card" id="add-card-btn">
@@ -572,6 +606,17 @@
 
       <p class="section-label" style="margin-top:36px;" id="usuarios-count">Usuarios</p>
       <div id="usuarios-list"></div>
+    </div>
+
+    <div class="tab-panel" id="panel-actividad" style="display:none;">
+      <p class="section-label">Administración</p>
+      <h1 class="display">Registro de actividad</h1>
+      <p style="color:var(--text-dim); font-size:0.85rem; margin:-20px 0 24px 0;">Muestra los últimos 200 eventos: inicios de sesión y aperturas de tableros.</p>
+      <div id="actividad-list"></div>
+      <div class="empty-state" id="actividad-empty" style="display:none;">
+        <span class="display">Aún no hay actividad registrada</span>
+        Los inicios de sesión y aperturas de tableros aparecerán aquí.
+      </div>
     </div>
   </main>
 </section>
@@ -691,6 +736,7 @@ auth.onAuthStateChanged((user) => {
     tableroSearchInput.value = '';
     if (unsubscribe) { unsubscribe(); unsubscribe = null; }
     if (unsubscribeUsuarios) { unsubscribeUsuarios(); unsubscribeUsuarios = null; }
+    if (unsubscribeActividad) { unsubscribeActividad(); unsubscribeActividad = null; }
   }
 });
 
@@ -702,6 +748,20 @@ auth.onAuthStateChanged((user) => {
 ====================================================================== */
 const PERFILES = "vivero_usuarios";
 let perfilActual = null;
+const ACTIVIDAD = "vivero_actividad";
+let unsubscribeActividad = null;
+
+/* ---- Registra un evento en el log de actividad (login o apertura de tablero) ---- */
+function registrarActividad(tipo, extra = {}) {
+  if (!perfilActual) return;
+  db.collection(ACTIVIDAD).add({
+    uid: perfilActual.uid,
+    email: perfilActual.email,
+    tipo,
+    ...extra,
+    fecha: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch((err) => console.error('Error registrando actividad:', err));
+}
 
 function cargarPerfil(user) {
   const ref = db.collection(PERFILES).doc(user.uid);
@@ -732,12 +792,15 @@ function despuesDePerfil() {
   const esAdmin = perfilActual.rol === 'admin';
   document.getElementById('tab-usuarios-btn').style.display = esAdmin ? 'inline-block' : 'none';
   document.getElementById('tab-clientes-btn').style.display = esAdmin ? 'inline-block' : 'none';
+  document.getElementById('tab-actividad-btn').style.display = esAdmin ? 'inline-block' : 'none';
   addCardBtn.style.display = esAdmin ? 'flex' : 'none';
   aplicarTemaSegunPerfil();
   escucharTableros();
+  registrarActividad('login');
   if (esAdmin) {
     escucharUsuarios();
     escucharClientes();
+    escucharActividad();
   }
 }
 
@@ -762,14 +825,36 @@ function coincideBusquedaTablero(t, termino) {
   return texto.includes(termino);
 }
 
+function ordenarPersonalizado(lista, ordenIds) {
+  const pos = new Map(ordenIds.map((id, i) => [id, i]));
+  return lista
+    .map((t, i) => ({ t, i, p: pos.has(t.id) ? pos.get(t.id) : Infinity }))
+    .sort((a, b) => (a.p - b.p) || (a.i - b.i))
+    .map(x => x.t);
+}
+
 function renderGridTableros() {
   const esAdmin = perfilActual.rol === 'admin';
+  const gridFav = document.getElementById('grid-favoritos');
+  const favSection = document.getElementById('favoritos-section');
   grid.querySelectorAll('.card:not(.add-card)').forEach(el => el.remove());
+  gridFav.innerHTML = '';
 
   tableroSearchRow.style.display = tablerosVisiblesActuales.length > 0 ? 'block' : 'none';
 
   const termino = terminoBusquedaTableros.trim().toLowerCase();
   const filtrados = tablerosVisiblesActuales.filter(t => coincideBusquedaTablero(t, termino));
+
+  const favoritos = perfilActual.favoritos || [];
+  const ordenIds = perfilActual.ordenTableros || [];
+  const puedeArrastrar = !termino; // desactiva el arrastre mientras se busca, para no mezclar el orden
+
+  const favs = ordenarPersonalizado(filtrados.filter(t => favoritos.includes(t.id)), ordenIds);
+  const resto = ordenarPersonalizado(filtrados.filter(t => !favoritos.includes(t.id)), ordenIds);
+
+  favSection.style.display = favs.length ? 'block' : 'none';
+  favs.forEach((t) => gridFav.appendChild(crearTarjeta(t.id, t, esAdmin, true, puedeArrastrar)));
+  resto.forEach((t) => grid.insertBefore(crearTarjeta(t.id, t, esAdmin, false, puedeArrastrar), addCardBtn));
 
   if (tablerosVisiblesActuales.length === 0) {
     emptyState.style.display = 'block';
@@ -786,10 +871,45 @@ function renderGridTableros() {
   } else {
     emptyState.style.display = 'none';
   }
+}
 
-  filtrados.forEach((t) => {
-    grid.insertBefore(crearTarjeta(t.id, t, esAdmin), addCardBtn);
-  });
+function toggleFavorito(id) {
+  const favoritos = perfilActual.favoritos || [];
+  const esFav = favoritos.includes(id);
+  perfilActual.favoritos = esFav ? favoritos.filter(f => f !== id) : [...favoritos, id]; // optimista
+  renderGridTableros();
+  db.collection(PERFILES).doc(perfilActual.uid).update({
+    favoritos: firebase.firestore.FieldValue[esFav ? 'arrayRemove' : 'arrayUnion'](id)
+  }).catch((err) => console.error('Error actualizando favoritos:', err));
+}
+
+function reordenarTablero(idArrastrado, idDestino) {
+  const favoritos = perfilActual.favoritos || [];
+  const grupoArrastrado = favoritos.includes(idArrastrado);
+  const grupoDestino = favoritos.includes(idDestino);
+  if (grupoArrastrado !== grupoDestino) return; // solo se reordena dentro del mismo grupo (favoritos u otros)
+
+  const ordenIds = perfilActual.ordenTableros || [];
+  const grupoAfectado = ordenarPersonalizado(
+    tablerosVisiblesActuales.filter(t => favoritos.includes(t.id) === grupoArrastrado),
+    ordenIds
+  ).map(t => t.id);
+  const otroGrupo = ordenarPersonalizado(
+    tablerosVisiblesActuales.filter(t => favoritos.includes(t.id) !== grupoArrastrado),
+    ordenIds
+  ).map(t => t.id);
+
+  const idxArrastrado = grupoAfectado.indexOf(idArrastrado);
+  const idxDestino = grupoAfectado.indexOf(idDestino);
+  if (idxArrastrado === -1 || idxDestino === -1) return;
+  grupoAfectado.splice(idxArrastrado, 1);
+  grupoAfectado.splice(grupoAfectado.indexOf(idDestino), 0, idArrastrado);
+
+  const nuevoOrden = grupoArrastrado ? [...grupoAfectado, ...otroGrupo] : [...otroGrupo, ...grupoAfectado];
+  perfilActual.ordenTableros = nuevoOrden; // optimista
+  renderGridTableros();
+  db.collection(PERFILES).doc(perfilActual.uid).update({ ordenTableros: nuevoOrden })
+    .catch((err) => console.error('Error guardando el orden:', err));
 }
 
 tableroSearchInput.addEventListener('input', (e) => {
@@ -822,11 +942,13 @@ function escucharTableros() {
     });
 }
 
-function crearTarjeta(id, data, esAdmin) {
+function crearTarjeta(id, data, esAdmin, esFavorito, arrastrable) {
   const a = document.createElement('div');
   a.className = 'card';
+  a.draggable = !!arrastrable;
   const cliente = data.clienteId ? todosClientes.find(c => c.id === data.clienteId) : null;
   a.innerHTML = `
+    <button type="button" class="icon-btn fav-btn ${esFavorito ? 'is-fav' : ''}" data-action="favorito" title="${esFavorito ? 'Quitar de favoritos' : 'Marcar como favorito'}">${esFavorito ? '★' : '☆'}</button>
     ${esAdmin ? `<div class="card-actions">
       <button type="button" class="icon-btn" data-action="edit" title="Editar">✎</button>
       <button type="button" class="icon-btn" data-action="delete" title="Eliminar">✕</button>
@@ -837,7 +959,14 @@ function crearTarjeta(id, data, esAdmin) {
     ${cliente ? `<div class="client-tag mono">${escapeHtml(cliente.nombre)}</div>` : ''}
     <div class="go">abrir →</div>
   `;
-  a.addEventListener('click', () => abrirVisor(data.url, data.nombre));
+  a.addEventListener('click', () => {
+    abrirVisor(data.url, data.nombre);
+    registrarActividad('tablero', { tableroId: id, tableroNombre: data.nombre });
+  });
+  a.querySelector('[data-action="favorito"]').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleFavorito(id);
+  });
   if (esAdmin) {
     a.querySelector('[data-action="edit"]').addEventListener('click', (e) => {
       e.stopPropagation();
@@ -853,6 +982,24 @@ function crearTarjeta(id, data, esAdmin) {
       if (ok) db.collection(COLLECTION).doc(id).delete();
     });
   }
+  a.addEventListener('dragstart', (e) => {
+    if (!a.draggable) { e.preventDefault(); return; }
+    e.dataTransfer.setData('text/plain', id);
+    e.dataTransfer.effectAllowed = 'move';
+    a.classList.add('dragging');
+  });
+  a.addEventListener('dragend', () => a.classList.remove('dragging'));
+  a.addEventListener('dragover', (e) => {
+    if (!a.draggable) return;
+    e.preventDefault();
+  });
+  a.addEventListener('drop', (e) => {
+    if (!a.draggable) return;
+    e.preventDefault();
+    const idArrastrado = e.dataTransfer.getData('text/plain');
+    if (!idArrastrado || idArrastrado === id) return;
+    reordenarTablero(idArrastrado, id);
+  });
   return a;
 }
 
@@ -1007,6 +1154,8 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
     document.getElementById('panel-tableros').style.display = tab === 'tableros' ? 'block' : 'none';
     document.getElementById('panel-clientes').style.display = tab === 'clientes' ? 'block' : 'none';
     document.getElementById('panel-usuarios').style.display = tab === 'usuarios' ? 'block' : 'none';
+    document.getElementById('panel-actividad').style.display = tab === 'actividad' ? 'block' : 'none';
+    if (tab === 'actividad') escucharActividad();
   });
 });
 
@@ -1152,6 +1301,50 @@ function procesarArchivoLogo(file, onListo, onError) {
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+/* ======================================================================
+   6a) REGISTRO DE ACTIVIDAD (solo visible para rol "admin")
+   Muestra los últimos 200 eventos: inicios de sesión y aperturas de tableros.
+====================================================================== */
+function escucharActividad() {
+  if (unsubscribeActividad) return;
+  unsubscribeActividad = db.collection(ACTIVIDAD).orderBy('fecha', 'desc').limit(200)
+    .onSnapshot((snapshot) => {
+      renderActividad(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => console.error('Error leyendo actividad:', err));
+}
+
+function renderActividad(eventos) {
+  const cont = document.getElementById('actividad-list');
+  const vacio = document.getElementById('actividad-empty');
+  if (!eventos.length) {
+    cont.innerHTML = '';
+    vacio.style.display = 'block';
+    return;
+  }
+  vacio.style.display = 'none';
+
+  const card = document.createElement('div');
+  card.className = 'actividad-card';
+  card.innerHTML = eventos.map((ev) => {
+    const fecha = (ev.fecha && ev.fecha.toDate) ? ev.fecha.toDate().toLocaleString('es-CO') : '—';
+    const esLogin = ev.tipo === 'login';
+    const etiqueta = esLogin ? 'Inicio de sesión' : 'Abrió tablero';
+    const detalle = esLogin ? '' : escapeHtml(ev.tableroNombre || 'Tablero eliminado');
+    return `
+      <div class="actividad-row">
+        <div>
+          <span class="actividad-tipo ${esLogin ? 'login' : 'tablero'}">${etiqueta}</span>
+          <span class="actividad-quien">${escapeHtml(ev.email || 'Desconocido')}</span>
+          ${detalle ? `<div class="actividad-detalle">${detalle}</div>` : ''}
+        </div>
+        <div class="actividad-fecha mono">${fecha}</div>
+      </div>
+    `;
+  }).join('');
+  cont.innerHTML = '';
+  cont.appendChild(card);
 }
 
 const CLIENTES = "vivero_clientes";
