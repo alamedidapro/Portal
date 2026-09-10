@@ -115,6 +115,20 @@
     transition:border-color 0.15s ease;
   }
   .login-card input:focus{ outline:none; border-color:#124b6e; }
+  .password-field{ position:relative; }
+  .password-field input{ padding-right:44px; }
+  .password-field button{
+    position:absolute; top:0; right:0; height:100%; width:42px;
+    background:none; border:none; font-size:0.95rem; opacity:0.55;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .password-field button:hover{ opacity:0.9; }
+  #forgot-password-link{
+    display:block; background:none; border:none; text-align:right;
+    color:#124b6e; font-size:0.82rem; margin:-10px 0 20px 0; padding:0;
+    font-family:'Work Sans', sans-serif; width:100%;
+  }
+  #forgot-password-link:hover{ text-decoration:underline; }
   .login-submit{
     width:100%; padding:13px; background:#0c3b57; color:#ffffff;
     font-weight:600; font-size:0.95rem; letter-spacing:0.01em;
@@ -468,13 +482,13 @@
     color:var(--text-dim); font-size:0.92rem; line-height:1.55;
     margin:0 0 22px 0; white-space:pre-line;
   }
-  input[type=text], input[type=url]{
+  input[type=text], input[type=url], .modal input[type=email]{
     width:100%; padding:12px 14px; margin-bottom:16px;
     background:var(--surface); border:1px solid var(--line);
     border-radius:8px; color:var(--text); font-size:0.9rem;
     font-family:'Work Sans', sans-serif;
   }
-  input[type=text]:focus, input[type=url]:focus{ outline:none; border-color:var(--leaf); }
+  input[type=text]:focus, input[type=url]:focus, .modal input[type=email]:focus{ outline:none; border-color:var(--leaf); }
   .modal select{
     width:100%; padding:12px 14px; margin-bottom:16px;
     background:var(--bg); border:1px solid var(--line);
@@ -570,7 +584,11 @@
         <label for="email">Email</label>
         <input type="email" id="email" required autocomplete="username">
         <label for="password">Contraseña</label>
-        <input type="password" id="password" required autocomplete="current-password">
+        <div class="password-field">
+          <input type="password" id="password" required autocomplete="current-password">
+          <button type="button" id="toggle-password" title="Mostrar contraseña">👁️</button>
+        </div>
+        <button type="button" id="forgot-password-link">¿Olvidaste tu contraseña?</button>
         <button type="submit" class="login-submit" id="login-btn">Entrar</button>
         <p id="login-error"></p>
       </form>
@@ -753,6 +771,22 @@
   </div>
 </div>
 
+<!-- ===================== MODAL RECUPERAR CONTRASEÑA ===================== -->
+<div class="modal-overlay" id="forgot-overlay">
+  <div class="modal">
+    <h2>Recuperar contraseña</h2>
+    <p class="modal-message">Escribe tu correo y te enviaremos un enlace para definir una nueva contraseña.</p>
+    <form id="forgot-form">
+      <input type="email" id="forgot-email" placeholder="tucorreo@ejemplo.com" required>
+      <p id="forgot-error" class="form-error"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="forgot-cancel">Cancelar</button>
+        <button type="submit" class="btn-primary" id="forgot-enviar">Enviar enlace</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 /* ======================================================================
    1) CONFIGURACIÓN DE FIREBASE
@@ -785,6 +819,72 @@ const loginForm = document.getElementById('login-form');
 const loginBtn = document.getElementById('login-btn');
 const loginError = document.getElementById('login-error');
 
+document.getElementById('toggle-password').addEventListener('click', () => {
+  const input = document.getElementById('password');
+  const btn = document.getElementById('toggle-password');
+  const visible = input.type === 'text';
+  input.type = visible ? 'password' : 'text';
+  btn.textContent = visible ? '👁️' : '🙈';
+  btn.title = visible ? 'Mostrar contraseña' : 'Ocultar contraseña';
+});
+
+const forgotOverlay = document.getElementById('forgot-overlay');
+const forgotForm = document.getElementById('forgot-form');
+const forgotEmailInput = document.getElementById('forgot-email');
+const forgotError = document.getElementById('forgot-error');
+const forgotEnviarBtn = document.getElementById('forgot-enviar');
+
+document.getElementById('forgot-password-link').addEventListener('click', () => {
+  forgotError.textContent = '';
+  // si ya había escrito su correo en el login, lo precarga para no repetir el tecleo
+  forgotEmailInput.value = document.getElementById('email').value.trim();
+  forgotOverlay.style.display = 'flex';
+  setTimeout(() => forgotEmailInput.focus(), 0);
+});
+
+document.getElementById('forgot-cancel').addEventListener('click', () => {
+  forgotOverlay.style.display = 'none';
+});
+forgotOverlay.addEventListener('click', (e) => {
+  if (e.target === forgotOverlay) forgotOverlay.style.display = 'none';
+});
+
+forgotForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const email = forgotEmailInput.value.trim();
+  forgotError.textContent = '';
+  if (!email) return;
+  forgotEnviarBtn.disabled = true;
+  forgotEnviarBtn.textContent = 'Enviando...';
+
+  auth.sendPasswordResetEmail(email, {
+    url: window.location.origin + window.location.pathname,
+    handleCodeInApp: false
+  })
+    // mismo mensaje ante éxito o error, para no revelar qué correos están registrados
+    .catch((err) => console.error(err))
+    .finally(() => {
+      forgotEnviarBtn.disabled = false;
+      forgotEnviarBtn.textContent = 'Enviar enlace';
+      forgotOverlay.style.display = 'none';
+      mostrarAviso('Correo enviado', `Si ${email} tiene una cuenta en Portal, te llegará un correo con instrucciones para definir una nueva contraseña.`);
+    });
+});
+
+/* ---- Traduce los códigos de error de Firebase Auth a mensajes claros en español ---- */
+function traducirErrorLogin(err) {
+  switch (err.code) {
+    case 'auth/invalid-email': return 'El correo no tiene un formato válido.';
+    case 'auth/user-disabled': return 'Esta cuenta fue deshabilitada. Contacta a tu administrador.';
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential': return 'Correo o contraseña incorrectos.';
+    case 'auth/too-many-requests': return 'Demasiados intentos fallidos. Espera un momento y vuelve a intentar.';
+    case 'auth/network-request-failed': return 'No se pudo conectar. Revisa tu conexión a internet.';
+    default: return 'No se pudo iniciar sesión. Intenta de nuevo.';
+  }
+}
+
 loginForm.addEventListener('submit', (e) => {
   e.preventDefault();
   loginError.textContent = '';
@@ -795,7 +895,7 @@ loginForm.addEventListener('submit', (e) => {
 
   auth.signInWithEmailAndPassword(email, password)
     .catch((err) => {
-      loginError.textContent = 'Correo o contraseña incorrectos.';
+      loginError.textContent = traducirErrorLogin(err);
       console.error(err);
     })
     .finally(() => {
@@ -838,6 +938,7 @@ auth.onAuthStateChanged((user) => {
     actualizarMarcaHeader(null);
     terminoBusquedaTableros = '';
     tableroSearchInput.value = '';
+    setTimeout(() => document.getElementById('email').focus(), 0);
     if (unsubscribe) { unsubscribe(); unsubscribe = null; }
     if (unsubscribeUsuarios) { unsubscribeUsuarios(); unsubscribeUsuarios = null; }
     if (unsubscribeActividad) { unsubscribeActividad(); unsubscribeActividad = null; }
