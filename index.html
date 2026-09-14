@@ -20,7 +20,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 
 <style>
   :root{
@@ -915,7 +914,6 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
-const storage = firebase.storage();
 const COLLECTION = "vivero_tableros"; // colección donde se guardan las tarjetas
 
 /* ======================================================================
@@ -1700,7 +1698,7 @@ function crearTarjetaUsuario(u) {
     }
     const ok = await confirmarAccion(
       'Quitar acceso',
-      `¿Quitar el acceso de "${u.email}"? Se eliminará su perfil y su cuenta de acceso ya no podrá iniciar sesión.\n\n(Requiere tener desplegada la Cloud Function de limpieza automática — ver backend/README-seguridad.md. Si no está desplegada, borra la cuenta manualmente desde Firebase Console > Authentication.)`,
+      `¿Quitar el acceso de "${u.email}"? Su cuenta de acceso sigue existiendo, pero no verá ningún tablero.\n\nPara eliminar la cuenta por completo, hazlo desde Firebase Console > Authentication.`,
       { textoConfirmar: 'Quitar acceso', peligroso: true }
     );
     if (ok) db.collection(PERFILES).doc(u.uid).delete();
@@ -1714,20 +1712,18 @@ function crearTarjetaUsuario(u) {
    Lista independiente de "empresas/clientes" que luego se puede marcar
    por usuario en la pestaña Usuarios, igual que los tableros.
 ====================================================================== */
-/* ---- Procesa un archivo de imagen subido: lo redimensiona en el navegador
-   y lo sube a Firebase Storage (carpeta logos-clientes/), devolviendo la URL
-   de descarga para guardar en el campo logoUrl. Ya no se guarda como base64
-   dentro del documento de Firestore (evita el límite de 1MB por documento
-   y no ensucia las lecturas del listado de clientes con datos pesados). ---- */
+/* ---- Procesa un archivo de imagen subido: lo redimensiona y lo convierte
+   en un data URI (base64) para guardarlo directo en el campo logoUrl,
+   sin necesidad de Firebase Storage (evita requerir el plan de pago). ---- */
 const LOGO_MAX_ALTO = 120; // px — de sobra para cómo se muestra el logo en el portal
+const LOGO_MAX_BYTES = 700000; // ~700KB, deja margen bajo el límite de 1MB de Firestore
 
-function procesarArchivoLogo(file, onListo, onError, onProgreso) {
-  const manejarError = onError || (() => {});
+function procesarArchivoLogo(file, onListo, onError) {
   const reader = new FileReader();
-  reader.onerror = () => manejarError('No se pudo leer el archivo.');
+  reader.onerror = () => (onError || (() => {}))('No se pudo leer el archivo.');
   reader.onload = (e) => {
     const img = new Image();
-    img.onerror = () => manejarError('El archivo no parece ser una imagen válida.');
+    img.onerror = () => (onError || (() => {}))('El archivo no parece ser una imagen válida.');
     img.onload = () => {
       const escala = Math.min(1, LOGO_MAX_ALTO / img.height);
       const w = Math.max(1, Math.round(img.width * escala));
@@ -1736,27 +1732,12 @@ function procesarArchivoLogo(file, onListo, onError, onProgreso) {
       canvas.width = w;
       canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      canvas.toBlob((blob) => {
-        if (!blob) { manejarError('No se pudo procesar la imagen.'); return; }
-        if (!auth.currentUser) { manejarError('Debes iniciar sesión para subir un logo.'); return; }
-        const nombreArchivo = `logos-clientes/${auth.currentUser.uid}_${Date.now()}.png`;
-        const ref = storage.ref().child(nombreArchivo);
-        const tarea = ref.put(blob, { contentType: 'image/png' });
-        tarea.on('state_changed',
-          (snapshot) => {
-            if (onProgreso) onProgreso(Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100));
-          },
-          (err) => {
-            console.error('Error subiendo logo:', err);
-            manejarError('No se pudo subir la imagen. Intenta de nuevo.');
-          },
-          () => {
-            tarea.snapshot.ref.getDownloadURL().then(onListo).catch(() => {
-              manejarError('Se subió la imagen pero no se pudo obtener el enlace.');
-            });
-          }
-        );
-      }, 'image/png');
+      const dataUrl = canvas.toDataURL('image/png');
+      if (dataUrl.length > LOGO_MAX_BYTES) {
+        (onError || (() => {}))('La imagen sigue siendo muy pesada. Prueba con un logo más simple o en formato JPG.');
+        return;
+      }
+      onListo(dataUrl);
     };
     img.src = e.target.result;
   };
