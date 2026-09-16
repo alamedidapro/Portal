@@ -1106,7 +1106,7 @@ auth.onAuthStateChanged((user) => {
     tableroSearchInput.value = '';
     setTimeout(() => document.getElementById('email').focus(), 0);
     document.getElementById('avatar-dropdown').style.display = 'none';
-    if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+    detenerEscuchaTableros();
     if (unsubscribeUsuarios) { unsubscribeUsuarios(); unsubscribeUsuarios = null; }
     if (unsubscribeActividad) { unsubscribeActividad(); unsubscribeActividad = null; }
     todasLasActividades = [];
@@ -1198,7 +1198,6 @@ const addCardBtn = document.getElementById('add-card-btn');
 const emptyState = document.getElementById('empty-state');
 const tableroSearchRow = document.getElementById('tablero-search-row');
 const tableroSearchInput = document.getElementById('tablero-search');
-let unsubscribe = null;
 let todosTableros = []; // cache completo, usado también por la pestaña Usuarios
 let tablerosVisiblesActuales = []; // visibles según permisos, antes de aplicar la búsqueda
 let terminoBusquedaTableros = '';
@@ -1314,30 +1313,113 @@ function mostrarSkeletonTableros() {
   grid.insertBefore(frag, addCardBtn);
 }
 
+let unsubscribes = []; // puede haber varias suscripciones activas (una por consulta)
+
+function partirEnGrupos(arr, tam) {
+  const grupos = [];
+  for (let i = 0; i < arr.length; i += tam) grupos.push(arr.slice(i, i + tam));
+  return grupos;
+}
+
+function detenerEscuchaTableros() {
+  unsubscribes.forEach(fn => fn && fn());
+  unsubscribes = [];
+}
+
+function mostrarErrorCargaTableros() {
+  // Limpia cualquier skeleton pegado y muestra un estado claro en vez de
+  // dejar la pantalla de carga indefinidamente (esto pasaba, por ejemplo,
+  // si las reglas de Firestore rechazan la consulta por algún desajuste).
+  document.querySelectorAll('.skeleton-card').forEach(el => el.remove());
+  todosTableros = [];
+  tablerosVisiblesActuales = [];
+  renderGridTableros();
+  mostrarToast(
+    'No se pudieron cargar los tableros',
+    'Verifica tu conexión o contacta al administrador si el problema continúa.',
+    8000
+  );
+}
+
 function escucharTableros() {
-  if (unsubscribe) return; // ya escuchando
+  if (unsubscribes.length) return; // ya escuchando
   mostrarSkeletonTableros();
-  unsubscribe = db.collection(COLLECTION).orderBy('creado', 'asc')
-    .onSnapshot((snapshot) => {
-      todosTableros = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      const esAdmin = perfilActual.rol === 'admin';
-      tablerosVisiblesActuales = esAdmin
-        ? todosTableros
-        : todosTableros.filter(t => {
-            if (t.clienteId) {
-              return (perfilActual.clientes || []).includes(t.clienteId);
-            }
-            return (perfilActual.tableros || []).includes(t.id);
-          });
+  const esAdmin = perfilActual.rol === 'admin';
 
-      renderGridTableros();
+  if (esAdmin) {
+    // El admin sí puede pedir la colección completa: las reglas se lo permiten
+    // sin depender de ningún campo por documento.
+    const unsub = db.collection(COLLECTION).orderBy('creado', 'asc')
+      .onSnapshot((snapshot) => {
+        todosTableros = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        tablerosVisiblesActuales = todosTableros;
+        renderGridTableros();
+        if (usuariosCache.length) renderUsuarios();
+      }, (err) => {
+        console.error('Error leyendo tableros (admin):', err);
+        mostrarErrorCargaTableros();
+      });
+    unsubscribes.push(unsub);
+    return;
+  }
 
-      // si la pestaña Usuarios ya está pintada, refresca sus checkboxes de tableros
-      if (esAdmin && usuariosCache.length) renderUsuarios();
-    }, (err) => {
-      console.error('Error leyendo tableros:', err);
-    });
+  // Usuario normal: en vez de traer TODA la colección y filtrar en el
+  // navegador (lo cual las reglas de seguridad ya no permiten, porque no
+  // pueden garantizar el filtro documento por documento en una consulta sin
+  // "where"), hacemos consultas ya filtradas del lado de Firestore. El
+  // resultado ES exactamente lo que el usuario puede ver — no hace falta
+  // volver a filtrar en el navegador.
+  const misClientes = (perfilActual.clientes || []).filter(Boolean);
+  const misTableros = (perfilActual.tableros || []).filter(Boolean);
+  const resultadosPorConsulta = new Map(); // clave = índice de consulta, valor = docs
+
+  function recombinar() {
+    const combinados = new Map();
+    resultadosPorConsulta.forEach(docs => docs.forEach(d => combinados.set(d.id, d)));
+    todosTableros = Array.from(combinados.values());
+    tablerosVisiblesActuales = todosTableros;
+    renderGridTableros();
+  }
+
+  let indice = 0;
+  // Firestore permite máximo 10 valores por cláusula "in", así que si un
+  // usuario tiene asignados más de 10 clientes o tableros sueltos, hay que
+  // partirlo en varias consultas.
+  partirEnGrupos(misClientes, 10).forEach((grupo) => {
+    const miIndice = indice++;
+    const unsub = db.collection(COLLECTION).where('clienteId', 'in', grupo)
+      .onSnapshot((snapshot) => {
+        resultadosPorConsulta.set(miIndice, snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+        recombinar();
+      }, (err) => {
+        console.error('Error leyendo tableros por cliente:', err);
+        mostrarErrorCargaTableros();
+      });
+    unsubscribes.push(unsub);
+  });
+
+  partirEnGrupos(misTableros, 10).forEach((grupo) => {
+    const miIndice = indice++;
+    const unsub = db.collection(COLLECTION).where(firebase.firestore.FieldPath.documentId(), 'in', grupo)
+      .onSnapshot((snapshot) => {
+        resultadosPorConsulta.set(miIndice, snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+        recombinar();
+      }, (err) => {
+        console.error('Error leyendo tableros sueltos:', err);
+        mostrarErrorCargaTableros();
+      });
+    unsubscribes.push(unsub);
+  });
+
+  if (!misClientes.length && !misTableros.length) {
+    // No tiene nada asignado: no hay nada que consultar, mostramos vacío
+    // de una vez en vez de dejar el skeleton esperando para siempre.
+    document.querySelectorAll('.skeleton-card').forEach(el => el.remove());
+    todosTableros = [];
+    tablerosVisiblesActuales = [];
+    renderGridTableros();
+  }
 }
 
 function crearTarjeta(id, data, esAdmin, esFavorito, arrastrable) {
