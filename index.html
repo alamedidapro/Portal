@@ -1226,11 +1226,22 @@ function coincideBusquedaTablero(t, termino) {
   return texto.includes(termino);
 }
 
+function esTableroGrupoLevapan(t) {
+  return /grupo\s*levapan/i.test(t && t.nombre || '');
+}
+
 function ordenarPersonalizado(lista, ordenIds) {
   const pos = new Map(ordenIds.map((id, i) => [id, i]));
   return lista
     .map((t, i) => ({ t, i, p: pos.has(t.id) ? pos.get(t.id) : Infinity }))
-    .sort((a, b) => (a.p - b.p) || (a.i - b.i))
+    .sort((a, b) => {
+      if (a.p !== Infinity || b.p !== Infinity) return (a.p - b.p) || (a.i - b.i);
+      // Sin orden manual guardado: Grupo Levapan primero, luego alfabético por nombre.
+      const aLev = esTableroGrupoLevapan(a.t);
+      const bLev = esTableroGrupoLevapan(b.t);
+      if (aLev !== bLev) return aLev ? -1 : 1;
+      return (a.t.nombre || '').localeCompare(b.t.nombre || '', 'es', { sensitivity: 'base' });
+    })
     .map(x => x.t);
 }
 
