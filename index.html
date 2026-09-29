@@ -239,14 +239,11 @@
      más denso a la izquierda y desvaneciéndose hacia la derecha. */
   #main-area::before{
     content:''; position:absolute; inset:0; z-index:-1; pointer-events:none;
-    background-image: radial-gradient(circle, rgba(16,24,32,0.14) 1.4px, transparent 1.6px);
+    background-image: radial-gradient(circle, var(--dot-color, rgba(16,24,32,0.14)) 1.4px, transparent 1.6px);
     background-size: 16px 16px;
     background-position: -4px -4px;
     -webkit-mask-image: linear-gradient(to right, #000 0%, transparent 30%, transparent 70%, #000 100%);
             mask-image: linear-gradient(to right, #000 0%, transparent 30%, transparent 70%, #000 100%);
-  }
-  html.dark-mode #main-area::before{
-    background-image: radial-gradient(circle, rgba(255,255,255,0.16) 1.4px, transparent 1.6px);
   }
 
   @media (max-width:820px){
@@ -748,7 +745,7 @@
           <p class="section-label">Tus tableros</p>
           <h1 class="display">Panel de acceso</h1>
           <div style="display:flex; justify-content:flex-start; margin:8px 0 20px;">
-            <img src="panel-logo.png" alt="" style="width:110px; height:auto; opacity:0.85;">
+            <img src="panel-logo.png?v=2" alt="" style="width:110px; height:auto; opacity:0.85;">
           </div>
           <div id="tablero-search-row" style="display:none; margin-bottom:20px;">
             <input type="text" id="tablero-search" class="search-input" placeholder="Buscar tablero..." aria-label="Buscar tablero">
@@ -1981,15 +1978,17 @@ let unsubscribeClientes = null;
 /* ---- Tema por cliente: sobrescribe las variables CSS de color ---- */
 const TEMA_DEFAULT = { temaPrimario: '#1e1b4b', temaSecundario: '#4f46e5' };
 
+function hexARgb(h) {
+  const limpio = (h || '').replace('#', '');
+  const num = parseInt(limpio.length === 3
+    ? limpio.split('').map(c => c + c).join('')
+    : limpio, 16);
+  if (isNaN(num)) return null;
+  return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+}
+
 function hexATintado(hex, mezclaBase, baseHex) {
-  const aRgb = (h) => {
-    const limpio = (h || '').replace('#', '');
-    const num = parseInt(limpio.length === 3
-      ? limpio.split('').map(c => c + c).join('')
-      : limpio, 16);
-    if (isNaN(num)) return null;
-    return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
-  };
+  const aRgb = hexARgb;
   const color = aRgb(hex);
   const base = aRgb(baseHex || '#ffffff');
   if (!color || !base) return null;
@@ -2016,6 +2015,15 @@ function aplicarTema(tema) {
   const mezclaHeader = esOscuro ? 0.94 : 0.97;
   document.documentElement.style.setProperty('--bg', hexATintado(primario, mezclaBg, baseBg) || baseBg);
   document.documentElement.style.setProperty('--header-bg', hexATintado(primario, mezclaHeader, baseHeader) || baseHeader);
+
+  // Puntos decorativos del fondo: usan el color secundario del cliente activo.
+  const secundarioRgb = hexARgb(secundario);
+  const alphaPuntos = esOscuro ? 0.35 : 0.22;
+  document.documentElement.style.setProperty(
+    '--dot-color',
+    secundarioRgb ? `rgba(${secundarioRgb.r}, ${secundarioRgb.g}, ${secundarioRgb.b}, ${alphaPuntos})` : null
+  );
+
   actualizarFavicon(primario, secundario);
 }
 
