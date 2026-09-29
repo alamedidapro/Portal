@@ -2010,14 +2010,10 @@ function aplicarTema(tema) {
   document.documentElement.style.setProperty('--leaf', secundario);
 
   const esOscuro = document.documentElement.classList.contains('dark-mode');
-  // fondo general y encabezado: tinte muy suave del color primario sobre una
-  // base clara u oscura según el modo, para que se sienta de marca sin perder legibilidad
-  const baseBg = esOscuro ? '#121920' : '#ffffff';
-  const baseHeader = esOscuro ? '#171f27' : '#ffffff';
-  const mezclaBg = esOscuro ? 0.90 : 0.93;
-  const mezclaHeader = esOscuro ? 0.94 : 0.97;
-  document.documentElement.style.setProperty('--bg', hexATintado(primario, mezclaBg, baseBg) || baseBg);
-  document.documentElement.style.setProperty('--header-bg', hexATintado(primario, mezclaHeader, baseHeader) || baseHeader);
+  // Fondo general y encabezado: siempre neutros (no se tiñen con la marca del
+  // cliente), para que el fondo de puntos y el contenido se vean iguales para todos.
+  document.documentElement.style.setProperty('--bg', esOscuro ? '#121920' : '#f4f4f8');
+  document.documentElement.style.setProperty('--header-bg', esOscuro ? '#171f27' : '#ffffff');
 
   actualizarFavicon(primario, secundario);
 }
