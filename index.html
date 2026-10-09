@@ -259,7 +259,7 @@
     #sidebar-nav{ flex-direction:row; flex-wrap:wrap; padding:0; }
   }
 
-  .user-form input[type=email], .user-form input[type=password]{
+  .user-form input[type=email], .user-form input[type=password], .user-form input[type=text]{
     width:100%; padding:12px 14px;
     background:var(--surface); border:1px solid var(--line);
     border-radius:8px; color:var(--text); font-size:0.9rem;
@@ -815,16 +815,21 @@
 
     <div class="tab-panel" id="panel-usuarios" style="display:none;">
       <p class="section-label">Administración</p>
-      <h1 class="display">Invitar usuario</h1>
+      <h1 class="display">Crear usuario</h1>
       <form id="user-form" class="user-form">
         <div class="user-form-row">
           <div style="flex:2;">
             <label for="u-email">Email</label>
-            <input type="email" id="u-email" required>
+            <input type="email" id="u-email" required autocomplete="off">
           </div>
-          <button type="submit" class="login-submit" id="user-create-btn" style="width:auto; padding:12px 24px;">Invitar</button>
+          <div style="flex:2;">
+            <label for="u-password">Contraseña</label>
+            <input type="password" id="u-password" required minlength="6" autocomplete="new-password">
+          </div>
+          <button type="button" class="btn-secondary" id="u-password-toggle" style="padding:12px 16px;">Mostrar</button>
+          <button type="submit" class="login-submit" id="user-create-btn" style="width:auto; padding:12px 24px;">Crear</button>
         </div>
-        <p style="color:var(--text-dim); font-size:0.8rem; margin:-10px 0 16px 0;">Se le enviará un correo para que defina su propia contraseña. Tú nunca ves ni eliges su contraseña.</p>
+        <p style="color:var(--text-dim); font-size:0.8rem; margin:-2px 0 16px 0;">Tú defines la contraseña (mínimo 6 caracteres) y se la entregas al usuario. Podrá cambiarla luego con "¿Olvidaste tu contraseña?".</p>
         <p id="user-form-error" class="form-error"></p>
       </form>
 
@@ -1178,7 +1183,7 @@ function cargarPerfil(user) {
             mostrarToast(
               esPrimero ? '¡Bienvenido a Portal!' : '¡Bienvenido!',
               esPrimero
-                ? 'Tu cuenta quedó como administrador. Desde "Usuarios" puedes invitar al resto del equipo.'
+                ? 'Tu cuenta quedó como administrador. Desde "Usuarios" puedes crear al resto del equipo.'
                 : 'Ya tienes acceso. Si no ves ningún tablero todavía, pide a tu administrador que te asigne uno.',
               7000
             );
@@ -1693,11 +1698,9 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
 
 /* ======================================================================
    6) ADMINISTRACIÓN DE USUARIOS (solo visible para rol "admin")
-   - Invita cuentas nuevas por correo: se crea la cuenta con una contraseña
-     aleatoria que NADIE ve (ni el admin, ni queda guardada en ningún lado),
-     y se le envía al usuario un correo de Firebase para que defina su
-     propia contraseña. Usa una instancia secundaria de Firebase para no
-     cerrar la sesión del admin mientras se crea la cuenta.
+   - Crea cuentas nuevas de forma manual: el admin escribe el correo y la
+     contraseña. Usa una instancia secundaria de Firebase para no cerrar
+     la sesión del admin mientras se crea la cuenta.
    - Asignar rol (admin / analista).
    - Asignar qué tableros puede ver cada analista.
    Nota de seguridad: esto controla lo que la INTERFAZ muestra. La
@@ -2233,32 +2236,17 @@ document.getElementById('client-form').addEventListener('submit', (e) => {
     });
 });
 
-/* --- Genera una contraseña temporal aleatoria: nunca se muestra, nunca se
-   guarda, y el usuario jamás llega a usarla — la reemplaza por la suya
-   propia al abrir el correo de invitación. --- */
-function generarPasswordTemporal() {
-  const azar = new Uint32Array(4);
-  crypto.getRandomValues(azar);
-  return Array.from(azar, (n) => n.toString(36)).join('') + 'Aa1!';
-}
-
-/* --- Invita a un usuario nuevo: crea la cuenta en Firebase Auth con una
-   contraseña aleatoria (descartada al instante) y le envía un correo de
-   restablecimiento de contraseña, para que sea el propio usuario quien
-   defina su acceso. --- */
-function crearUsuarioAuth(email) {
+/* --- Crea un usuario nuevo en Firebase Auth con el correo y la contraseña
+   que escribe el administrador. --- */
+function crearUsuarioAuth(email, password) {
   // App secundaria temporal: evita cerrar la sesión del admin actual
   // al crear la nueva cuenta.
   const appSecundaria = firebase.initializeApp(firebaseConfig, 'secundaria-' + Date.now());
-  return appSecundaria.auth().createUserWithEmailAndPassword(email, generarPasswordTemporal())
+  return appSecundaria.auth().createUserWithEmailAndPassword(email, password)
     .then((cred) => {
       const uid = cred.user.uid;
       return appSecundaria.auth().signOut()
         .then(() => appSecundaria.delete())
-        .then(() => auth.sendPasswordResetEmail(email, {
-          url: window.location.origin + window.location.pathname,
-          handleCodeInApp: false
-        }))
         .then(() => uid);
     })
     .catch((err) => {
@@ -2272,20 +2260,29 @@ function traducirErrorAuth(err) {
     case 'auth/email-already-in-use': return 'Ese correo ya tiene una cuenta.';
     case 'auth/weak-password': return 'La contraseña debe tener al menos 6 caracteres.';
     case 'auth/invalid-email': return 'El correo no es válido.';
-    default: return 'No se pudo invitar al usuario. Revisa la consola.';
+    default: return 'No se pudo crear el usuario. Revisa la consola.';
   }
 }
+
+document.getElementById('u-password-toggle').addEventListener('click', () => {
+  const input = document.getElementById('u-password');
+  const btn = document.getElementById('u-password-toggle');
+  const oculta = input.type === 'password';
+  input.type = oculta ? 'text' : 'password';
+  btn.textContent = oculta ? 'Ocultar' : 'Mostrar';
+});
 
 document.getElementById('user-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const email = document.getElementById('u-email').value.trim();
+  const password = document.getElementById('u-password').value;
   const errorEl = document.getElementById('user-form-error');
   const btn = document.getElementById('user-create-btn');
   errorEl.textContent = '';
   btn.disabled = true;
-  btn.textContent = 'Invitando...';
+  btn.textContent = 'Creando...';
 
-  crearUsuarioAuth(email)
+  crearUsuarioAuth(email, password)
     .then((uid) => db.collection(PERFILES).doc(uid).set({
       email,
       rol: 'analista',
@@ -2295,7 +2292,7 @@ document.getElementById('user-form').addEventListener('submit', (e) => {
     }))
     .then(() => {
       document.getElementById('user-form').reset();
-      mostrarAviso('Invitación enviada', `Se envió un correo a ${email} con instrucciones para definir su contraseña y entrar al portal.`);
+      mostrarAviso('Usuario creado', `La cuenta de ${email} quedó creada. Entrégale la contraseña que definiste para que pueda entrar al portal.`);
     })
     .catch((err) => {
       console.error(err);
@@ -2303,7 +2300,7 @@ document.getElementById('user-form').addEventListener('submit', (e) => {
     })
     .finally(() => {
       btn.disabled = false;
-      btn.textContent = 'Invitar';
+      btn.textContent = 'Crear';
     });
 });
 </script>
