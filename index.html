@@ -1412,6 +1412,7 @@ function escucharTableros() {
     todosTableros = Array.from(combinados.values());
     tablerosVisiblesActuales = todosTableros;
     renderGridTableros();
+    aplicarTemaPorTableros();
   }
 
   let indice = 0;
@@ -2071,9 +2072,21 @@ function actualizarMarcaHeader(cliente) {
   }
 }
 
+let temaClienteForzado = null;
+let temaClienteAplicado = null;
+function aplicarTemaPorTableros() {
+  if (!perfilActual || perfilActual.rol === 'admin') return;
+  const t = todosTableros.find(x => x.clienteId);
+  const cid = t ? t.clienteId : null;
+  if (!cid || cid === temaClienteAplicado) return;
+  temaClienteAplicado = cid;
+  temaClienteForzado = cid;
+  aplicarTemaSegunPerfil();
+}
+
 function aplicarTemaSegunPerfil() {
   if (!perfilActual) { aplicarTema(TEMA_DEFAULT); actualizarMarcaHeader(null); return; }
-  const primerClienteId = (perfilActual.clientes || [])[0];
+  const primerClienteId = temaClienteForzado || (perfilActual.clientes || [])[0];
   if (perfilActual.rol === 'admin' || !primerClienteId) {
     aplicarTema(TEMA_DEFAULT);
     actualizarMarcaHeader(null);
