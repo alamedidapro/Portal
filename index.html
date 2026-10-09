@@ -1777,21 +1777,25 @@ function crearTarjetaUsuario(u) {
     });
   });
 
+  // Guarda los tableros y deja en "clientes" los clientes de esos tableros
+  // (así el color/marca del cliente y las reglas siguen funcionando).
+  const guardarTableros = (ids, agregar) => {
+    const ref = db.collection(PERFILES).doc(u.uid);
+    return ref.get().then((snap) => {
+      const actual = new Set((snap.data() || {}).tableros || []);
+      ids.forEach((id) => agregar ? actual.add(id) : actual.delete(id));
+      const clientesDe = new Set(todosTableros.filter(t => actual.has(t.id) && t.clienteId).map(t => t.clienteId));
+      return ref.update({ tableros: Array.from(actual), clientes: Array.from(clientesDe) });
+    }).catch((err) => { console.error(err); mostrarAviso('No se pudo guardar', 'No se pudo actualizar los tableros del usuario.'); });
+  };
+
   div.querySelectorAll('input[data-tablero]').forEach((chk) => {
-    chk.addEventListener('change', () => {
-      const ref = db.collection(PERFILES).doc(u.uid);
-      const campo = { tableros: firebase.firestore.FieldValue[chk.checked ? 'arrayUnion' : 'arrayRemove'](chk.dataset.tablero) };
-      ref.update(campo);
-    });
+    chk.addEventListener('change', () => guardarTableros([chk.dataset.tablero], chk.checked));
   });
 
   div.querySelectorAll('input[data-cliente]').forEach((chk) => {
     chk.indeterminate = chk.dataset.parcial === '1';
-    chk.addEventListener('change', () => {
-      const ids = chk.dataset.ids.split(',').filter(Boolean);
-      const ref = db.collection(PERFILES).doc(u.uid);
-      ref.update({ tableros: firebase.firestore.FieldValue[chk.checked ? 'arrayUnion' : 'arrayRemove'](...ids) });
-    });
+    chk.addEventListener('change', () => guardarTableros(chk.dataset.ids.split(',').filter(Boolean), chk.checked));
   });
 
   div.querySelector('[data-action="reenviar"]').addEventListener('click', () => {
