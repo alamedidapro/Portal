@@ -1727,6 +1727,21 @@ function renderUsuarios() {
   document.getElementById('usuarios-count').textContent = `Usuarios (${usuariosCache.length})`;
   cont.innerHTML = '';
   usuariosCache.forEach((u) => cont.appendChild(crearTarjetaUsuario(u)));
+  sincronizarClientesUsuarios();
+}
+
+// Deja en "clientes" de cada usuario los clientes de sus tableros asignados
+// (necesario para que vea el color/marca de su cliente). Solo escribe si difiere.
+function sincronizarClientesUsuarios() {
+  if (!todosTableros.length) return;
+  usuariosCache.forEach((u) => {
+    if (u.rol === 'admin') return;
+    const esperado = Array.from(new Set(todosTableros.filter(t => (u.tableros || []).includes(t.id) && t.clienteId).map(t => t.clienteId))).sort();
+    const actual = (u.clientes || []).slice().sort();
+    if (esperado.join('|') !== actual.join('|')) {
+      db.collection(PERFILES).doc(u.uid).update({ clientes: esperado }).catch((err) => console.error('Error sincronizando clientes:', err));
+    }
+  });
 }
 
 function crearTarjetaUsuario(u) {
