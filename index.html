@@ -1402,7 +1402,7 @@ function escucharTableros() {
   // "where"), hacemos consultas ya filtradas del lado de Firestore. El
   // resultado ES exactamente lo que el usuario puede ver — no hace falta
   // volver a filtrar en el navegador.
-  const misClientes = (perfilActual.clientes || []).filter(Boolean);
+  const misClientes = []; // el acceso ahora se da por tablero (el cliente solo agrupa/marca todos sus tableros)
   const misTableros = (perfilActual.tableros || []).filter(Boolean);
   const resultadosPorConsulta = new Map(); // clave = índice de consulta, valor = docs
 
@@ -1737,20 +1737,19 @@ function crearTarjetaUsuario(u) {
   const chkTablero = (t) => `
         <label><input type="checkbox" data-tablero="${t.id}" ${(u.tableros || []).includes(t.id) ? 'checked' : ''}> ${escapeHtml(t.nombre)}</label>`;
   const gruposTableros = todosClientes
-    .map(c => ({ nombre: c.nombre, lista: todosTableros.filter(t => t.clienteId === c.id) }))
-    .concat([{ nombre: 'Sin cliente', lista: todosTableros.filter(t => !t.clienteId || !todosClientes.some(c => c.id === t.clienteId)) }])
+    .map(c => ({ id: c.id, nombre: c.nombre, lista: todosTableros.filter(t => t.clienteId === c.id) }))
+    .concat([{ id: '', nombre: 'Sin cliente', lista: todosTableros.filter(t => !t.clienteId || !todosClientes.some(c => c.id === t.clienteId)) }])
     .filter(g => g.lista.length);
+  const asignados = u.tableros || [];
   const checkboxesTableros = gruposTableros.length
-    ? gruposTableros.map(g => `
-        <div class="user-date" style="width:100%; margin-top:6px;">${escapeHtml(g.nombre)}</div>
-        ${g.lista.map(chkTablero).join('')}`).join('')
+    ? gruposTableros.map(g => {
+        const n = g.lista.filter(t => asignados.includes(t.id)).length;
+        const cab = g.id
+          ? `<label style="font-weight:600;"><input type="checkbox" data-cliente="${g.id}" data-ids="${g.lista.map(t => t.id).join(',')}" data-parcial="${n > 0 && n < g.lista.length ? 1 : 0}" ${n === g.lista.length ? 'checked' : ''}> ${escapeHtml(g.nombre)} <span class="user-date">(${n}/${g.lista.length}) — marcar todos</span></label>`
+          : `<div class="user-date" style="font-weight:600;">${escapeHtml(g.nombre)}</div>`;
+        return `<div style="width:100%; margin-top:8px;">${cab}<div class="check-row" style="margin-left:22px;">${g.lista.map(chkTablero).join('')}</div></div>`;
+      }).join('')
     : '<span class="user-date">Aún no hay tableros por asignar.</span>';
-
-  const checkboxesClientes = todosClientes.length
-    ? todosClientes.map(c => `
-        <label><input type="checkbox" data-cliente="${c.id}" ${(u.clientes || []).includes(c.id) ? 'checked' : ''}> ${escapeHtml(c.nombre)}</label>
-      `).join('')
-    : '<span class="user-date">Aún no hay clientes creados.</span>';
 
   div.innerHTML = `
     <div class="user-card-head">
@@ -1768,9 +1767,7 @@ function crearTarjetaUsuario(u) {
       <label><input type="radio" name="rol-${u.uid}" value="admin" ${u.rol === 'admin' ? 'checked' : ''}> admin</label>
       <label><input type="radio" name="rol-${u.uid}" value="analista" ${u.rol !== 'admin' ? 'checked' : ''}> analista</label>
     </div>
-    <div class="user-section-label">Clientes (da acceso a todos los tableros del cliente)</div>
-    <div class="check-row">${checkboxesClientes}</div>
-    <div class="user-section-label">Tableros individuales (elige cuáles ve, agrupados por cliente)</div>
+    <div class="user-section-label">Tableros visibles (por cliente; marca el cliente para todos o elige uno a uno)</div>
     <div class="check-row">${checkboxesTableros}</div>
   `;
 
@@ -1789,10 +1786,11 @@ function crearTarjetaUsuario(u) {
   });
 
   div.querySelectorAll('input[data-cliente]').forEach((chk) => {
+    chk.indeterminate = chk.dataset.parcial === '1';
     chk.addEventListener('change', () => {
+      const ids = chk.dataset.ids.split(',').filter(Boolean);
       const ref = db.collection(PERFILES).doc(u.uid);
-      const campo = { clientes: firebase.firestore.FieldValue[chk.checked ? 'arrayUnion' : 'arrayRemove'](chk.dataset.cliente) };
-      ref.update(campo);
+      ref.update({ tableros: firebase.firestore.FieldValue[chk.checked ? 'arrayUnion' : 'arrayRemove'](...ids) });
     });
   });
 
