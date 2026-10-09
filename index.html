@@ -1734,12 +1734,17 @@ function crearTarjetaUsuario(u) {
   const fecha = (u.creado && u.creado.toDate) ? u.creado.toDate().toLocaleDateString('es-CO') : '—';
   const esTu = u.uid === perfilActual.uid;
 
-  const tablerosSinCliente = todosTableros.filter(t => !t.clienteId);
-  const checkboxesTableros = tablerosSinCliente.length
-    ? tablerosSinCliente.map(t => `
-        <label><input type="checkbox" data-tablero="${t.id}" ${(u.tableros || []).includes(t.id) ? 'checked' : ''}> ${escapeHtml(t.nombre)}</label>
-      `).join('')
-    : '<span class="user-date">No hay tableros sueltos (sin cliente) por asignar.</span>';
+  const chkTablero = (t) => `
+        <label><input type="checkbox" data-tablero="${t.id}" ${(u.tableros || []).includes(t.id) ? 'checked' : ''}> ${escapeHtml(t.nombre)}</label>`;
+  const gruposTableros = todosClientes
+    .map(c => ({ nombre: c.nombre, lista: todosTableros.filter(t => t.clienteId === c.id) }))
+    .concat([{ nombre: 'Sin cliente', lista: todosTableros.filter(t => !t.clienteId || !todosClientes.some(c => c.id === t.clienteId)) }])
+    .filter(g => g.lista.length);
+  const checkboxesTableros = gruposTableros.length
+    ? gruposTableros.map(g => `
+        <div class="user-date" style="width:100%; margin-top:6px;">${escapeHtml(g.nombre)}</div>
+        ${g.lista.map(chkTablero).join('')}`).join('')
+    : '<span class="user-date">Aún no hay tableros por asignar.</span>';
 
   const checkboxesClientes = todosClientes.length
     ? todosClientes.map(c => `
@@ -1763,9 +1768,9 @@ function crearTarjetaUsuario(u) {
       <label><input type="radio" name="rol-${u.uid}" value="admin" ${u.rol === 'admin' ? 'checked' : ''}> admin</label>
       <label><input type="radio" name="rol-${u.uid}" value="analista" ${u.rol !== 'admin' ? 'checked' : ''}> analista</label>
     </div>
-    <div class="user-section-label">Clientes visibles (controla los tableros con cliente asignado)</div>
+    <div class="user-section-label">Clientes (da acceso a todos los tableros del cliente)</div>
     <div class="check-row">${checkboxesClientes}</div>
-    <div class="user-section-label">Otros tableros visibles (sin cliente)</div>
+    <div class="user-section-label">Tableros individuales (elige cuáles ve, agrupados por cliente)</div>
     <div class="check-row">${checkboxesTableros}</div>
   `;
 
@@ -2256,11 +2261,17 @@ function crearUsuarioAuth(email, password) {
 }
 
 function traducirErrorAuth(err) {
-  switch (err.code) {
+  const cod = (err && err.code) ? err.code : 'sin-codigo';
+  switch (cod) {
     case 'auth/email-already-in-use': return 'Ese correo ya tiene una cuenta.';
     case 'auth/weak-password': return 'La contraseña debe tener al menos 6 caracteres.';
+    case 'auth/password-does-not-meet-requirements': return 'La contraseña no cumple la política de seguridad de Firebase (prueba con mayúsculas, minúsculas, números y un símbolo).';
     case 'auth/invalid-email': return 'El correo no es válido.';
-    default: return 'No se pudo crear el usuario. Revisa la consola.';
+    case 'auth/operation-not-allowed':
+    case 'auth/admin-restricted-operation': return 'Firebase no permite crear cuentas desde el portal. Revisa en Authentication → Settings → User actions que esté activado el registro, y que el proveedor Correo/contraseña esté habilitado.';
+    case 'auth/network-request-failed': return 'Sin conexión con Firebase. Revisa tu internet e inténtalo de nuevo.';
+    case 'permission-denied': return 'La cuenta se creó, pero las reglas de Firestore no permitieron guardar su perfil (permission-denied). Revisa las reglas de la colección de usuarios.';
+    default: return 'No se pudo crear el usuario (' + cod + '). ' + ((err && err.message) ? err.message : '');
   }
 }
 
